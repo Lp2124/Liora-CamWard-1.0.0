@@ -1,0 +1,99 @@
+No considero esta fase aprobada todavía. El informe describe correcciones, pero necesito evidencia reproducible y quedan varios problemas técnicos.
+
+1. Entrega el diff completo o commit de cada cambio.
+
+2. Ejecuta y muestra pruebas automatizadas para:
+
+* IDOR entre dos usuarios.
+* IDs inexistentes y pertenecientes a terceros con respuestas indistinguibles.
+* Fabricación de `riskLevel`, `riskScore`, `severity` y `findings`.
+* Envío de propiedades desconocidas.
+* Cierre simultáneo de una inspección.
+* Consumo concurrente de cuota.
+* Bypass de rate limit.
+* Payload chunked sin `Content-Length`.
+* Payload con `Content-Length` falso.
+* Replay de observaciones.
+* Observaciones duplicadas.
+* CORS con origen permitido, prohibido, `null`, puerto distinto y subdominio malicioso.
+* Peticiones HTTP con POST/PATCH y cuerpo.
+* Acceso cruzado a lectura, escritura, cierre, exportación y eliminación.
+
+3. Sustituye el rate limit en memoria por almacenamiento distribuido. Debe funcionar con múltiples instancias, serverless y reinicios. Utiliza una operación atómica en Redis/Upstash o equivalente.
+
+La clave del rate limit debe combinar, según disponibilidad:
+
+* Usuario.
+* Sesión.
+* Dispositivo.
+* IP.
+* Ruta.
+* Tipo de operación.
+
+4. No uses `301` para redirigir peticiones API con cuerpo. Utiliza `308` o rechaza HTTP en producción. Solo confía en `x-forwarded-proto` cuando la petición provenga de un proxy explícitamente confiable.
+
+5. No presentes `X-XSS-Protection` como mitigación relevante. Añade una CSP estricta con nonce o hashes, `frame-ancestors`, `object-src 'none'`, `base-uri 'self'` y `form-action 'self'`.
+
+6. Implementa CORS mediante una allowlist explícita de orígenes completos normalizados. No compares ingenuamente `Origin` con `Host`.
+
+Debe cubrir:
+
+* Esquema.
+* Host.
+* Puerto.
+* Punycode.
+* Mayúsculas/minúsculas.
+* `Origin: null`.
+* Preflight.
+* `Vary: Origin`.
+* Credenciales.
+* Subdominios maliciosos.
+
+CORS no debe considerarse un sustituto de autenticación o autorización.
+
+7. Los límites de cuerpo deben aplicarse durante el streaming real del request, no solamente revisando `Content-Length`. Cancela la lectura al superar el máximo.
+
+8. Conserva `review_required` como observación informativa auditable, pero:
+
+* No debe generar hallazgo.
+* No debe elevar riesgo.
+* No debe mostrarse como detección.
+* Debe conservar el motivo, confianza, versión del algoritmo y evidencia relacionada.
+
+9. Demuestra que ningún endpoint permite al cliente controlar directa o indirectamente:
+
+* Severidad.
+* Riesgo.
+* Veredicto final.
+* Confianza final.
+* Categoría forense.
+* Texto oficial del hallazgo.
+* Datos firmados por el servidor.
+
+10. La cuota debe verificarse e incrementarse en una sola operación condicional. No basta con un `UPSERT` que incremente sin impedir superar el límite.
+
+La operación debe devolver éxito únicamente cuando el contador anterior esté por debajo del límite. Añade una prueba con al menos 100 solicitudes concurrentes y demuestra que jamás se conceden más operaciones que la cuota configurada.
+
+11. Añade idempotencia a observaciones y cierre de sesiones:
+
+* `observationId` emitido o aceptado una sola vez.
+* Nonce.
+* Timestamp.
+* Hash del contenido.
+* Restricción única.
+* Respuesta consistente ante reintentos.
+
+12. Ejecuta:
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm test:integration
+pnpm test:security
+pnpm build
+```
+
+Incluye la salida completa, cobertura y lista de pruebas.
+
+No continúes con diseño ni con nuevas funciones hasta que esta fase tenga código verificable, pruebas negativas y resultados reproducibles.

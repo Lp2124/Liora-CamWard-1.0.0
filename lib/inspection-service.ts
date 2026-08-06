@@ -65,6 +65,58 @@ export async function consumeFreeScanSlot(user: AppUser): Promise<void> {
   }
 }
 
+// ── Idempotency: deduplicate by captureNonce ───────────────────────────────────
+
+/**
+ * Returns an existing finding by captureNonce, or null if not seen before.
+ * The unique index on evidence->>'captureNonce' makes the INSERT below
+ * throw a unique-constraint error on replay; this pre-check allows us to
+ * return a consistent 200 response to retries without re-processing.
+ */
+async function findExistingByNonce(
+  captureNonce: string,
+  sessionId: string,
+): Promise<ObservationAnalysisResponse | null> {
+  const [existing] = await db
+    .select()
+    .from(scanFindings)
+    .where(
+      sql`${scanFindings.sessionId} = ${sessionId}
+          AND evidence->>'captureNonce' = ${captureNonce}`,
+    )
+    .limit(1);
+
+  if (!existing) return null;
+
+  // Reconstruct a consistent response from the persisted finding
+  return {
+    observationId: existing.id,
+    inspectionId: sessionId,
+    verdict: (existing.evidence as Record<string, unknown>)?.verdict as import('@liora/contracts').VisualVerdict ?? 'clear',
+    riskContribution: {
+      score: 0,
+      level: 'informational',
+      confidence: 1,
+      contributingEvidenceIds: [existing.id],
+      discardedEvidenceIds: [],
+      contradictions: ['Respuesta idempotente — observación ya procesada.'],
+      nextRecommendation: 'Observación duplicada devuelta desde caché.',
+      algorithmVersion: '1.0.0',
+      calculatedAt: new Date().toISOString(),
+    },
+    findings: [{
+      id: existing.id,
+      module: existing.module as import('@liora/contracts').ModuleId,
+      severity: existing.severity as import('@liora/contracts').FindingSeverity,
+      title: existing.title,
+      detail: existing.detail,
+      evidence: { source: existing.module, captureTimestamp: existing.createdAt.toISOString() },
+    }],
+    processedAt: existing.createdAt.toISOString(),
+    algorithmVersion: '1.0.0',
+  };
+}
+
 // ── Análisis de observación óptica ─────────────────────────────────────────────
 
 export async function analyzeOpticalObservation(
@@ -72,6 +124,10 @@ export async function analyzeOpticalObservation(
   req: SubmitOpticalObservationRequest,
 ): Promise<ObservationAnalysisResponse> {
   await validateInspectionOwnership(req.inspectionId, user);
+
+  // Idempotency: return existing result for repeated nonce
+  const cached = await findExistingByNonce(req.captureNonce, req.inspectionId);
+  if (cached) return cached;
 
   // Servidor calcula clasificación — el cliente no puede manipular el resultado
   const classification = classifyOpticalObservation(
@@ -164,6 +220,9 @@ export async function analyzeMagneticObservation(
 ): Promise<ObservationAnalysisResponse> {
   await validateInspectionOwnership(req.inspectionId, user);
 
+  const cached = await findExistingByNonce(req.captureNonce, req.inspectionId);
+  if (cached) return cached;
+
   const analysis = analyzeMagneticSamples(req.samples, {
     baselineSampleMs: DEFAULT_DETECTION_CONFIG.magnetic.baselineSampleMs,
     anomalyDeltaUt: DEFAULT_DETECTION_CONFIG.magnetic.anomalyDeltaUt,
@@ -250,6 +309,9 @@ export async function analyzeBleObservation(
 ): Promise<ObservationAnalysisResponse> {
   await validateInspectionOwnership(req.inspectionId, user);
 
+  const cached = await findExistingByNonce(req.captureNonce, req.inspectionId);
+  if (cached) return cached;
+
   const observationId = randomUUID();
   const serverTimestamp = new Date().toISOString();
   const findings = [];
@@ -327,6 +389,9 @@ export async function analyzeNetworkObservation(
   req: SubmitNetworkObservationRequest,
 ): Promise<ObservationAnalysisResponse> {
   await validateInspectionOwnership(req.inspectionId, user);
+
+  const cached = await findExistingByNonce(req.captureNonce, req.inspectionId);
+  if (cached) return cached;
 
   const observationId = randomUUID();
   const serverTimestamp = new Date().toISOString();

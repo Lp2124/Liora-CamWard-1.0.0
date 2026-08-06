@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { finishScanSession, getScanSessionWithFindings } from '@/lib/scan-service';
 import { handleApiError } from '@/lib/api-error-response';
-import { NotFoundError, UnauthorizedError, ValidationError, PayloadTooLargeError } from '@/lib/errors';
+import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
+import { readBodyJson } from '@/lib/body-parser';
 
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_MODULES = new Set(['network', 'bluetooth', 'optical', 'magnetic']);
-const MAX_BODY_BYTES = 16 * 1024; // 16 KB — just modulesRun list, no findings payload
+const MAX_BODY_BYTES = 16 * 1024;
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -35,22 +36,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!user) throw new UnauthorizedError('Debes iniciar sesión.');
     const { id } = await params;
 
-    const contentLength = Number(request.headers.get('content-length') ?? '0');
-    if (contentLength > MAX_BODY_BYTES) throw new PayloadTooLargeError('Cuerpo demasiado grande.');
+    const b = await readBodyJson<Record<string, unknown>>(request, MAX_BODY_BYTES);
 
-    const raw = await request.text().catch(() => null);
-    if (!raw) throw new ValidationError('Cuerpo de solicitud inválido.');
-    if (raw.length > MAX_BODY_BYTES) throw new PayloadTooLargeError('Cuerpo demasiado grande.');
-
-    let body: unknown;
-    try { body = JSON.parse(raw); } catch { throw new ValidationError('Cuerpo de solicitud inválido.'); }
-    if (typeof body !== 'object' || body === null) throw new ValidationError('Cuerpo de solicitud inválido.');
-
-    // Only accept modulesRun — reject any attempt to supply riskLevel or findings
-    const b = body as Record<string, unknown>;
-    const forbidden = ['riskLevel', 'findings', 'severity', 'riskScore'];
+    // Only accept modulesRun — reject any attempt to supply server-computed fields
+    const forbidden = ['riskLevel', 'findings', 'severity', 'riskScore', 'verdict', 'confidence'];
     for (const f of forbidden) {
-      if (f in b) throw new ValidationError(`Campo '${f}' no está permitido — el servidor lo calcula a partir de las observaciones persistidas.`);
+      if (f in b) throw new ValidationError(`Campo '${f}' no está permitido — el servidor lo calcula.`);
     }
 
     const modulesRun = Array.isArray(b.modulesRun)

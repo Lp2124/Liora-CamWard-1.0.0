@@ -11,6 +11,8 @@
     "build": "next build",
     "start": "next start -p 13000",
     "test": "node --import tsx --test lib/request.test.ts lib/scan/detection.test.ts",
+    "test:security": "node --import tsx --test lib/security.test.ts",
+    "test:all": "node --import tsx --test lib/request.test.ts lib/scan/detection.test.ts lib/security.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
