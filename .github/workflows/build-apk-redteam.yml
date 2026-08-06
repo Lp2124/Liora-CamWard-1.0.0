@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - build/apk-redteam-20260806
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
