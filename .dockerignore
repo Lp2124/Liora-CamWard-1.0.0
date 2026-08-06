@@ -1,0 +1,22 @@
+.git
+.gitignore
+.next
+.open-next
+.pnpm-store
+.wrangler
+coverage
+dist
+node_modules
+playwright-report
+test-results
+*.tsbuildinfo
+
+# NUNCA copiar secretos en la imagen
+.env
+.env.local
+.env.production
+.env.*.local
+*.pem
+*.key
+service-account-key.json
+attachements/

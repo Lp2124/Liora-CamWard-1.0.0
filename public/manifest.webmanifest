@@ -1,0 +1,15 @@
+{
+  "name": "Liora CamWard — Detector de cámaras ocultas",
+  "short_name": "Liora CamWard",
+  "description": "Escaneo real de cámaras y dispositivos ocultos combinando red, óptica y campo magnético.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1418",
+  "theme_color": "#0d1418",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

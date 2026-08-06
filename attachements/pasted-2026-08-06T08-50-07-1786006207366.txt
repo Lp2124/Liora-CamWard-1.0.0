@@ -1,0 +1,37 @@
+Continúa con la implementación funcional y de seguridad. No ajustes el diseño todavía.
+
+Que Next.js detecte automáticamente las rutas dentro de `app/` no confirma que estén completas ni operativas. Verifica cada ruta mediante pruebas reales:
+
+* Que compile sin errores.
+* Que no devuelva 404 o 500.
+* Que tenga validación de entrada.
+* Que aplique autenticación y autorización por recurso.
+* Que no permita IDOR.
+* Que limite tamaño y frecuencia de solicitudes.
+* Que use manejo centralizado de errores.
+* Que tenga pruebas unitarias e integración.
+* Que no existan rutas duplicadas, huérfanas o simuladas.
+
+Continúa con las correcciones prioritarias de la auditoría:
+
+1. El servidor debe calcular severidad, confianza y riesgo.
+2. El cliente no debe poder fabricar evidencias.
+3. `review_required` no debe mostrarse como detección.
+4. Sustituye el umbral fijo del magnetómetro por calibración diferencial.
+5. Implementa correlación espacial y temporal.
+6. Corrige la cadena de confianza de las firmas forenses.
+7. Añade rate limiting, HTTPS obligatorio y CORS restringido.
+8. Corrige las condiciones de carrera en activaciones y cuotas.
+9. Implementa BLE y análisis de red reales donde el sistema operativo lo permita.
+10. Añade pruebas específicas contra falsos positivos.
+
+No me entregues solo recomendaciones. Realiza los cambios sobre el proyecto, ejecuta las pruebas y muestra por cada fase:
+
+* Archivos modificados.
+* Código implementado.
+* Comandos ejecutados.
+* Resultados de las pruebas.
+* Errores pendientes.
+* Criterio de aceptación cumplido.
+
+No avances al rediseño visual hasta que el núcleo de detección, seguridad y evidencias funcione correctamente.

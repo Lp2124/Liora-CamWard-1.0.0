@@ -1,0 +1,932 @@
+Actúa como un equipo senior compuesto por:
+
+* Red Team Lead.
+* Arquitecto de seguridad móvil.
+* Ingeniero principal React Native/Expo.
+* Ingeniero backend TypeScript/PostgreSQL.
+* Especialista en visión computacional.
+* Ingeniero de señales y sensores móviles.
+* Ingeniero DevSecOps.
+* Especialista en publicación de Google Play y Apple App Store.
+* QA Lead especializado en pruebas físicas, seguridad y falsos positivos.
+
+Tu misión es auditar, corregir, completar y preparar para producción la aplicación **LIORA CAMWARD** contenida en el archivo ZIP proporcionado.
+
+Debes trabajar directamente sobre el código existente. No debes generar una maqueta separada, una demo desconectada ni un proyecto nuevo que ignore la implementación actual.
+
+# OBJETIVO PRINCIPAL
+
+Transformar LIORA CAMWARD en una aplicación móvil real, segura y técnicamente honesta para asistir en la detección de posibles cámaras ocultas mediante análisis óptico, sensores disponibles en el teléfono, Bluetooth Low Energy, red local y correlación de evidencias.
+
+La aplicación no puede presentar incertidumbre como detección confirmada.
+
+Debes reducir falsos positivos mediante calibración, persistencia, repetibilidad, correlación espacial y temporal, análisis diferencial y niveles de confianza medibles.
+
+No prometas “cero falsos positivos” ni “detección 100 % garantizada”. Implementa un sistema que mida sus tasas reales y comunique correctamente el nivel de evidencia.
+
+# REGLAS ESTRICTAS DE DESARROLLO
+
+1. Genera código real, completo, compilable y funcional.
+
+2. Prohibido usar:
+
+* Pseudocódigo.
+* Funciones vacías.
+* Datos aleatorios presentados como resultados.
+* Botones sin lógica.
+* Comentarios como `TODO`.
+* Comentarios como “implementar después”.
+* Mockups presentados como funcionalidad.
+* Resultados simulados en builds de producción.
+* Variables sin utilizar.
+* Rutas declaradas pero no implementadas.
+* Interfaces sin implementación real.
+* Respuestas hardcodeadas para aparentar detección.
+
+3. No omitas archivos por longitud. Si un archivo es demasiado grande, divídelo en módulos completos y entrega todos los módulos.
+
+4. Mantén TypeScript estricto.
+
+5. Toda entrada externa debe validarse mediante esquemas cerrados.
+
+6. Todo cambio de base de datos debe incluir migraciones ejecutables.
+
+7. Toda función crítica debe incluir pruebas unitarias, pruebas de integración y casos negativos.
+
+8. Conserva las funciones existentes que sean correctas. Refactoriza únicamente cuando exista una razón técnica concreta.
+
+9. Antes de modificar, realiza un inventario completo de:
+
+* Aplicación web.
+* Aplicación Expo/React Native.
+* Backend.
+* Base de datos.
+* Scripts.
+* Docker.
+* CI/CD.
+* Configuración de Expo.
+* Dependencias.
+* Variables de entorno.
+* Funciones implementadas.
+* Funciones incompletas.
+* Funciones simuladas.
+* Duplicación entre proyectos.
+
+10. La entrega final debe compilar sin errores, superar pruebas y generar artefactos reales.
+
+# ARQUITECTURA REQUERIDA
+
+Separa claramente:
+
+* `apps/mobile`: aplicación React Native/Expo.
+* `apps/web`: panel web, documentación o administración.
+* `apps/api`: backend.
+* `packages/contracts`: esquemas compartidos.
+* `packages/detection-core`: motor de clasificación y correlación.
+* `packages/forensics`: canonicalización, hash, firma y verificación.
+* `packages/config`: configuración tipada y validada.
+* `packages/testing`: fixtures y utilidades de prueba.
+* `infra`: Docker, despliegue, migraciones y CI/CD.
+
+No dupliques contratos manualmente entre cliente y servidor.
+
+Utiliza esquemas compartidos versionados para API y evidencias.
+
+# CORRECCIÓN CRÍTICA: AUTORIDAD DEL SERVIDOR
+
+Actualmente el cliente puede enviar campos como:
+
+* `riskLevel`.
+* `severity`.
+* Tipo final de hallazgo.
+* Evidencia.
+* Coordenadas.
+* Fuente.
+* Timestamps.
+* Texto descriptivo.
+* Datos posteriormente firmados.
+
+Esto debe eliminarse.
+
+El cliente solo puede enviar observaciones crudas, por ejemplo:
+
+* Muestras de sensor.
+* Metadatos de captura.
+* Imagen original.
+* Hash local preliminar.
+* Orientación.
+* Exposición.
+* Timestamp monotónico.
+* Identificador de sesión.
+* Identificador del dispositivo.
+* Calidad de la medición.
+
+El servidor debe calcular exclusivamente:
+
+* Clasificación.
+* Severidad.
+* Nivel de riesgo.
+* Confianza.
+* Correlación.
+* Resultado final.
+* Texto del hallazgo.
+* Inclusión en reporte forense.
+
+Implementa autorización por recurso y verifica que cada evidencia pertenezca a la inspección y al usuario autenticado.
+
+Toda evidencia debe utilizar:
+
+* `inspectionId`.
+* `evidenceId` emitido por el servidor.
+* Nonce de captura.
+* Timestamp del servidor.
+* Hash SHA-256 del archivo recibido.
+* Tamaño real.
+* MIME detectado mediante contenido.
+* Estado de procesamiento.
+* Versión del algoritmo.
+* Versión del modelo.
+* Resultado del análisis.
+* Estado de revisión.
+
+El servidor no debe firmar contenido arbitrario enviado por el cliente.
+
+# CLASIFICACIÓN VISUAL CORRECTA
+
+Corrige cualquier lógica equivalente a:
+
+```ts
+const detected = verdict !== "clear";
+```
+
+Implementa estados explícitos:
+
+```ts
+type VisualVerdict =
+  | "clear"
+  | "insufficient_evidence"
+  | "review_required"
+  | "suspected_device"
+  | "confirmed_device";
+```
+
+Reglas:
+
+* `clear`: no crear hallazgo.
+* `insufficient_evidence`: solicitar nueva captura.
+* `review_required`: crear observación informativa, no alerta.
+* `suspected_device`: crear hallazgo pendiente de corroboración.
+* `confirmed_device`: solo permitido cuando existen evidencias suficientes y consistentes.
+
+Para elevar a `suspected_device`, exigir:
+
+* Confianza por encima de un umbral configurable.
+* Región concreta dentro de la imagen.
+* Categoría identificable.
+* Explicación basada en rasgos observables.
+* Calidad mínima de imagen.
+* Ausencia de blur severo.
+* Exposición aceptable.
+* Segunda captura desde otro ángulo.
+* Consistencia entre ambas capturas.
+
+Para elevar a `confirmed_device`, exigir corroboración adicional, por ejemplo:
+
+* Coincidencia visual repetida.
+* Evidencia de red o BLE compatible.
+* Inspección manual validada.
+* Captura cercana que muestre componentes físicos compatibles.
+
+Nunca conviertas una respuesta ambigua del modelo en “ANOMALÍA DETECTADA”.
+
+# ANÁLISIS ÓPTICO
+
+Sustituye umbrales ópticos simples por un pipeline medible.
+
+Implementa:
+
+1. Captura con iluminación normal.
+2. Captura con linterna apagada.
+3. Captura con linterna encendida.
+4. Bloqueo de enfoque y exposición cuando el hardware lo permita.
+5. Registro de orientación.
+6. Comparación diferencial entre capturas.
+7. Detección de reflejos especulares persistentes.
+8. Evaluación de forma, circularidad y tamaño.
+9. Verificación mediante cambio de ángulo.
+10. Seguimiento mediante optical flow o feature matching.
+11. Eliminación de reflejos que no mantengan comportamiento compatible con una superficie óptica.
+12. Clasificador específico para posibles lentes.
+13. Confidence score calibrado.
+14. Non-maximum suppression para evitar duplicados.
+15. Evidencia visual marcada mediante bounding boxes.
+
+El sistema debe distinguir, en la medida posible:
+
+* Tornillos.
+* LEDs.
+* Vidrio.
+* Plástico brillante.
+* Gotas.
+* Metal cromado.
+* Cerámica.
+* Espejos.
+* Lentes.
+* Sensores expuestos.
+
+No declares “visión infrarroja” si solamente estás usando una cámara RGB convencional.
+
+Renombra la función como:
+
+**Búsqueda de emisores infrarrojos visibles para la cámara**
+
+Implementa una prueba de compatibilidad por dispositivo usando una fuente IR de referencia. Si el sensor no detecta IR, deshabilita la función y explica la limitación.
+
+# MAGNETÓMETRO Y CAMPO MAGNÉTICO
+
+Elimina cualquier alerta basada en una sola lectura absoluta como:
+
+```ts
+magnitude > 80
+```
+
+Implementa:
+
+1. Calibración inicial de 3 a 5 segundos.
+2. Baseline mediante mediana.
+3. Dispersión mediante MAD, Median Absolute Deviation.
+4. Suavizado robusto.
+5. Compensación por orientación.
+6. Ventana deslizante.
+7. Histéresis.
+8. Detección diferencial respecto al baseline.
+9. Persistencia mínima del incremento.
+10. Verificación al acercar y alejar el teléfono.
+11. Repetición en un segundo barrido.
+12. Gradiente espacial.
+13. Detección de saturación o sensor inestable.
+14. Estado de calibración inválida.
+15. Calidad de señal.
+
+No etiquetes una lectura magnética como “cámara detectada”.
+
+Utiliza estados como:
+
+* Campo normal.
+* Variación ambiental.
+* Fuente magnética cercana.
+* Medición inestable.
+* Requiere verificación.
+* Fuente repetible localizada.
+
+El magnetómetro solo debe aportar evidencia secundaria.
+
+No afirmes que el magnetómetro mide RF. Campo magnético y radiofrecuencia son señales diferentes.
+
+# BLUETOOTH LOW ENERGY
+
+La versión web que utiliza `requestDevice()` no debe presentarse como escaneo general.
+
+En la aplicación móvil implementa BLE real mediante una biblioteca mantenida y compatible con builds nativos.
+
+Recopila:
+
+* RSSI.
+* Manufacturer data.
+* Service UUIDs.
+* Device name.
+* Local name.
+* Connectability.
+* Frecuencia de aparición.
+* Persistencia.
+* Variación de RSSI.
+* Identificador anonimizado.
+* Timestamp.
+
+Implementa:
+
+* Permisos correctos por versión de Android.
+* Permisos iOS.
+* Manejo de Bluetooth desactivado.
+* Manejo de ubicación cuando sea requerida.
+* Escaneo por ventanas.
+* Deduplicación.
+* Clasificación de dispositivos conocidos.
+* Base de firmas versionada.
+* Lista de exclusión de dispositivos comunes.
+* Repetibilidad.
+
+No clasifiques un dispositivo como cámara únicamente por su nombre BLE.
+
+Un dispositivo BLE debe clasificarse inicialmente como:
+
+* Conocido.
+* No identificado.
+* Compatible con equipo multimedia.
+* Requiere inspección.
+* Señal persistente cercana.
+
+# ANÁLISIS DE RED
+
+Implementa análisis real únicamente donde el sistema operativo lo permita.
+
+Debe incluir:
+
+* Información de la red actual.
+* Dirección IP local.
+* Gateway.
+* DNS.
+* BSSID cuando esté permitido.
+* Descubrimiento ARP o equivalente cuando sea viable.
+* mDNS.
+* SSDP/UPnP.
+* ONVIF discovery donde esté permitido.
+* Servicios RTSP conocidos.
+* Puertos típicos mediante estrategia limitada y controlada.
+* Hostnames.
+* Fabricante por OUI mediante base local versionada.
+* Servicios anunciados.
+* Firmas de dispositivos IoT.
+* Persistencia entre escaneos.
+
+No bloquees la interfaz mientras se analiza la red.
+
+No clasifiques como cámara:
+
+* Televisores.
+* Routers.
+* Chromecast.
+* Bocinas.
+* Impresoras.
+* Asistentes domésticos.
+* Teléfonos.
+* Laptops.
+
+El resultado debe distinguir:
+
+* Dispositivo conocido.
+* IoT no identificado.
+* Servicio multimedia.
+* Interfaz compatible con cámara.
+* Evidencia insuficiente.
+* Dispositivo sospechoso corroborado.
+
+# CORRELACIÓN DE EVIDENCIAS
+
+El nivel de riesgo no puede subir solamente porque existan alertas de dos módulos diferentes.
+
+Crea un motor de correlación que considere:
+
+* Proximidad temporal.
+* Proximidad espacial.
+* Ubicación dentro de la habitación.
+* Repetibilidad.
+* Calidad de señal.
+* Confianza de cada módulo.
+* Compatibilidad causal.
+* Independencia de evidencias.
+* Evidencia contradictoria.
+* Modelo del teléfono.
+* Fiabilidad del sensor.
+
+Ejemplo correcto:
+
+Un reflejo óptico persistente en un punto específico, combinado con un dispositivo BLE o de red cuya intensidad aumenta al acercarse al mismo punto, puede elevar el riesgo.
+
+Ejemplo incorrecto:
+
+Un cargador que eleva el magnetómetro en una pared y un televisor BLE en otra parte de la habitación no deben considerarse evidencia corroborada.
+
+Implementa una matriz de correlación versionada, pruebas unitarias y explicación legible de cómo se calculó el riesgo.
+
+# MODELO DE RIESGO
+
+Implementa niveles:
+
+* `none`.
+* `informational`.
+* `low`.
+* `medium`.
+* `high`.
+* `critical`.
+
+Cada resultado debe incluir:
+
+* Score numérico.
+* Nivel.
+* Confianza.
+* Evidencias contribuyentes.
+* Evidencias descartadas.
+* Contradicciones.
+* Recomendación siguiente.
+* Versión del algoritmo.
+
+El score final debe calcularse en el servidor.
+
+No permitas que el cliente lo envíe.
+
+# REPORTES FORENSES
+
+Mantén Ed25519, pero corrige el modelo de confianza.
+
+El reporte debe incluir:
+
+* `reportId`.
+* `inspectionId`.
+* `userId` anonimizado.
+* Fecha del servidor.
+* Hash de cada evidencia.
+* Hash raíz del reporte.
+* Algoritmo de canonicalización.
+* Versión del esquema.
+* Versión del motor.
+* `keyId`.
+* Periodo de validez de la clave.
+* Firma.
+* Cadena de confianza.
+* Información de revocación.
+
+No utilices exclusivamente una clave pública incluida dentro del mismo reporte como raíz de confianza.
+
+La aplicación verificadora debe tener claves públicas confiables fijadas o consultar un registro firmado de claves.
+
+Implementa:
+
+* Rotación de claves.
+* Revocación.
+* Registro de claves.
+* Verificación local.
+* Verificador CLI.
+* Verificador web.
+* Pruebas de manipulación.
+* Pruebas con firma incorrecta.
+* Pruebas con clave no confiable.
+* Pruebas con contenido modificado.
+
+La aplicación móvil no debe confiar en un simple booleano `verified: true` devuelto por el servidor.
+
+# AUTENTICACIÓN Y SESIONES
+
+Implementa:
+
+* Access tokens de duración corta.
+* Refresh tokens rotatorios.
+* Revocación.
+* Detección de reutilización de refresh token.
+* Sesiones por dispositivo.
+* Hash de tokens en base de datos.
+* Registro de último uso.
+* IP y user-agent normalizados.
+* Cierre remoto de sesión.
+* Límite de dispositivos.
+
+Liga la sesión móvil al dispositivo mediante un par de claves generado localmente cuando sea viable.
+
+Cada solicitud sensible debe incluir una prueba firmada con:
+
+* Método.
+* Ruta.
+* Timestamp.
+* Nonce.
+* Hash del cuerpo.
+
+Para web:
+
+* No almacenar bearer tokens en `localStorage`.
+* Utilizar cookies `HttpOnly`.
+* `Secure`.
+* `SameSite`.
+* Protección CSRF.
+* CSP estricta.
+
+# ACTIVACIONES Y PREMIUM
+
+Corrige condiciones de carrera.
+
+La redención de códigos debe usar una operación atómica:
+
+```sql
+UPDATE activation_codes
+SET redeemed_at = NOW(),
+    redeemed_by = $1
+WHERE code_hash = $2
+  AND redeemed_at IS NULL
+  AND expires_at > NOW()
+RETURNING *;
+```
+
+Implementa:
+
+* Transacción.
+* Bloqueo o actualización condicional.
+* Intentos atómicos.
+* Rate limit por IP.
+* Rate limit por dispositivo.
+* Rate limit por hash de código.
+* Bloqueo temporal.
+* Auditoría.
+
+Las cuotas gratuitas también deben incrementarse atómicamente.
+
+# ENDPOINT DE VISIÓN
+
+Protege el endpoint mediante:
+
+* Rate limit por usuario.
+* Rate limit por dispositivo.
+* Rate limit por IP.
+* Cuota diaria.
+* Límite concurrente.
+* Timeout.
+* Circuit breaker.
+* Deduplicación por hash.
+* Cache segura.
+* Tamaño máximo.
+* Dimensiones máximas.
+* Detección real de MIME.
+* Rechazo de formatos no permitidos.
+* Protección contra decompression bombs.
+* Eliminación de metadatos EXIF sensibles cuando corresponda.
+* Presupuesto máximo por usuario.
+* Registro de costo.
+* Idempotency key.
+
+# API Y VALIDACIÓN
+
+Configura:
+
+* CORS mediante allowlist.
+* HTTPS obligatorio en producción.
+* Hostnames permitidos.
+* HSTS.
+* Security headers.
+* Body limits.
+* Depth limits.
+* Límites de arrays.
+* Esquemas cerrados.
+* Rechazo de propiedades desconocidas.
+* UUID validation.
+* Ownership checks.
+* Logging estructurado.
+* Redacción de secretos.
+* Correlation IDs.
+* Manejo centralizado de errores.
+
+No copies `.env` dentro de imágenes Docker.
+
+Inyecta secretos en runtime.
+
+# SUPPLY CHAIN
+
+Corrige CI/CD:
+
+* Fijar versiones de acciones y herramientas.
+* Verificar SHA-256 de binarios descargados.
+* Generar SBOM.
+* Ejecutar auditoría de dependencias.
+* Ejecutar secret scanning.
+* Ejecutar SAST.
+* Ejecutar pruebas.
+* Generar builds reproducibles.
+* Firmar artefactos.
+* Generar provenance.
+* Publicar checksums.
+* Bloquear release si fallan pruebas críticas.
+
+No ejecutar binarios descargados sin validar su firma o checksum.
+
+# CONFIGURACIÓN DE DETECCIÓN
+
+Las configuraciones de sensibilidad deben estar realmente conectadas al motor.
+
+Implementa configuración versionada:
+
+* Umbrales ópticos.
+* Parámetros magnéticos.
+* Persistencia.
+* Confidence threshold.
+* Correlación.
+* Pesos de riesgo.
+* Exclusiones.
+* Firmas BLE.
+* Firmas de red.
+
+Toda configuración remota debe estar firmada.
+
+La app debe rechazar configuraciones inválidas o no firmadas.
+
+# FUNCIONES INCOMPLETAS
+
+Identifica y elimina de producción cualquier módulo marcado como:
+
+* En desarrollo.
+* Experimental.
+* Simulado.
+* No implementado.
+
+El módulo 3D no debe presentarse como operativo hasta tener una implementación real.
+
+Puede conservarse detrás de:
+
+* Feature flag.
+* Build interno.
+* Pantalla experimental claramente marcada.
+
+No debe contribuir al score de riesgo.
+
+# PRIVACIDAD
+
+Implementa:
+
+* Procesamiento local cuando sea viable.
+* Consentimiento explícito antes de subir imágenes.
+* Eliminación configurable.
+* Retención mínima.
+* Cifrado en tránsito.
+* Cifrado en reposo.
+* Eliminación de EXIF.
+* No registrar imágenes en logs.
+* No registrar bearer tokens.
+* No registrar coordenadas precisas innecesarias.
+* Exportación y eliminación de datos.
+* Política de privacidad preparada para tiendas.
+
+# PRUEBAS DE FALSOS POSITIVOS
+
+Crea un framework de evaluación reproducible.
+
+Incluye datasets y fixtures para:
+
+## Escenarios negativos
+
+* Tornillos cromados.
+* Vidrio.
+* Espejos.
+* Cerámica.
+* LEDs.
+* Cargadores.
+* Altavoces.
+* Televisores.
+* Routers.
+* Motores.
+* Electrodomésticos.
+* Tuberías.
+* Estructuras metálicas.
+* Gotas de agua.
+* Plásticos brillantes.
+* Dispositivos Bluetooth legítimos.
+* Dispositivos IoT comunes.
+
+## Escenarios positivos
+
+* Cámara Wi-Fi.
+* Cámara BLE.
+* Cámara con SIM.
+* Cámara cableada.
+* Cámara apagada.
+* Cámara con almacenamiento local.
+* Cámara detrás de cristal.
+* Cámara detrás de plástico.
+* Cámara dentro de detector de humo.
+* Cámara dentro de cargador.
+* Cámara dentro de reloj.
+* Cámara sin emisión de red.
+* Emisor IR.
+* Cámara con IR desactivado.
+
+Métricas obligatorias:
+
+* False Positive Rate.
+* False Negative Rate.
+* Precision.
+* Recall.
+* F1.
+* Sensitivity.
+* Specificity.
+* Latencia.
+* Repetibilidad.
+* Resultado por modelo de teléfono.
+* Resultado por versión del sistema operativo.
+* Intervalos de confianza.
+
+Los resultados deben exportarse como JSON, CSV y reporte HTML.
+
+No uses datos inventados. Si no existe una campaña física ejecutada, marca las métricas como pendientes y entrega las herramientas para ejecutarla.
+
+# PRUEBAS DE SEGURIDAD
+
+Incluye pruebas para:
+
+* Evidencia fabricada por cliente.
+* Manipulación de reporte.
+* Reutilización de token.
+* Robo de token.
+* IDOR.
+* Replay.
+* Race condition.
+* Rate-limit bypass.
+* Device ID rotation.
+* Imagen maliciosa.
+* JSON profundamente anidado.
+* Body oversized.
+* MIME spoofing.
+* Firma inválida.
+* Clave no confiable.
+* Webhook repetido.
+* Webhook falsificado.
+* Código premium redimido concurrentemente.
+* Cuota gratuita superada mediante concurrencia.
+* SQL injection.
+* XSS.
+* CSRF.
+* SSRF.
+* Path traversal.
+* Dependency confusion.
+* Secret leakage.
+
+# BUILDS MÓVILES
+
+Configura la aplicación móvil para generar:
+
+## Android
+
+* APK de pruebas.
+* AAB de producción.
+* `android.package`.
+* `versionCode`.
+* Keystore externo.
+* Firma release.
+* ProGuard/R8.
+* Network Security Config.
+* Permisos mínimos.
+* Adaptive icon.
+* Splash.
+* Deep links.
+* Privacy declarations.
+* Data safety mapping.
+
+## iOS
+
+* `bundleIdentifier`.
+* `buildNumber`.
+* Entitlements.
+* Permisos.
+* Privacy manifest.
+* App icons.
+* Launch screen.
+* Associated domains si aplica.
+* Configuración de firma.
+* Archive válido.
+* IPA o proyecto listo para firma mediante EAS/Xcode.
+
+Incluye:
+
+* `eas.json`.
+* Perfiles `development`, `preview` y `production`.
+* Variables por ambiente.
+* Comandos exactos.
+* Configuración de credenciales.
+* Scripts reproducibles.
+
+Elimina cualquier origen de desarrollo o Replit de builds de producción.
+
+# PLAY STORE Y APP STORE
+
+Genera:
+
+* Nombre de aplicación.
+* Descripción corta.
+* Descripción larga.
+* Keywords.
+* Categoría.
+* Política de privacidad.
+* Términos.
+* Texto de permisos.
+* Data Safety de Google Play.
+* App Privacy de Apple.
+* Instrucciones de revisión.
+* Cuenta demo para revisión si aplica.
+* Capturas requeridas como checklist.
+* Feature graphic como especificación.
+* Release notes.
+* Checklist previo al envío.
+
+No afirmes que la aplicación garantiza la ausencia de cámaras.
+
+Utiliza lenguaje como:
+
+“LIORA CAMWARD ayuda a identificar señales y anomalías que pueden requerir inspección adicional. Ningún análisis basado únicamente en un teléfono puede descartar todos los dispositivos ocultos.”
+
+# ENTREGABLES OBLIGATORIOS
+
+Entrega:
+
+1. Informe de auditoría inicial.
+2. Arquitectura encontrada.
+3. Lista de fallos.
+4. Matriz de riesgo.
+5. Plan de cambios.
+6. Código fuente completo corregido.
+7. Migraciones.
+8. Pruebas.
+9. Dataset de fixtures no sensibles.
+10. Scripts de evaluación.
+11. Dockerfiles corregidos.
+12. CI/CD corregido.
+13. `.env.example` sin secretos.
+14. Documentación de despliegue.
+15. Documentación de builds.
+16. Documentación de publicación.
+17. Verificador forense CLI.
+18. Verificador web.
+19. SBOM.
+20. Checksums.
+21. APK de prueba.
+22. AAB release.
+23. Configuración iOS lista para archive.
+24. Archivo ZIP o TAR final con todo el proyecto.
+
+# FORMATO DE TRABAJO
+
+Trabaja por fases, pero no dejes fases incompletas.
+
+Para cada fase muestra:
+
+* Archivos modificados.
+* Razón del cambio.
+* Riesgo corregido.
+* Código completo.
+* Comando de validación.
+* Resultado de pruebas.
+* Criterio de aceptación.
+
+Fases:
+
+1. Inventario y reproducción del proyecto.
+2. Arquitectura y contratos.
+3. Seguridad de autenticación.
+4. Autoridad del servidor.
+5. Evidencias y reportes forenses.
+6. Motor óptico.
+7. Magnetómetro.
+8. BLE.
+9. Red.
+10. Correlación.
+11. Riesgo.
+12. Privacidad.
+13. Backend hardening.
+14. Supply chain.
+15. Pruebas.
+16. Builds.
+17. Preparación para tiendas.
+18. Empaquetado final.
+
+# CRITERIOS DE ACEPTACIÓN
+
+No declares terminado hasta cumplir:
+
+* TypeScript sin errores.
+* Linter sin errores críticos.
+* Todas las rutas implementadas.
+* Ningún botón de producción sin función.
+* Ningún resultado aleatorio.
+* Ninguna severidad controlada por cliente.
+* Ningún reporte firmado con datos arbitrarios.
+* `review_required` no presentado como detección.
+* Magnetómetro calibrado diferencialmente.
+* BLE real en móvil.
+* Análisis de red técnicamente honesto.
+* Correlación espacial y temporal.
+* CORS restringido.
+* HTTPS obligatorio.
+* Rate limits activos.
+* Sesiones seguras.
+* Condiciones de carrera corregidas.
+* Webhooks idempotentes.
+* Docker sin secretos.
+* CI con verificación de binarios.
+* Pruebas de seguridad aprobadas.
+* Pruebas de detección aprobadas.
+* APK instalable.
+* AAB válido.
+* Configuración iOS válida.
+* Documentación completa.
+* ZIP o TAR final generado.
+
+# PROHIBICIÓN FINAL
+
+No respondas únicamente con recomendaciones.
+
+No entregues un simple análisis.
+
+Debes inspeccionar el proyecto, modificarlo, ejecutar pruebas, corregir los errores encontrados y entregar código funcional.
+
+Cuando una función no sea técnicamente posible por restricciones del hardware o del sistema operativo, debes:
+
+1. Explicar la limitación exacta.
+2. No simularla.
+3. Deshabilitarla o marcarla correctamente.
+4. Implementar la mejor alternativa real disponible.
+5. Evitar afirmaciones engañosas en la interfaz.
+
+Empieza inspeccionando todo el archivo proporcionado y presenta el inventario técnico antes de escribir modificaciones.

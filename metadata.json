@@ -1,0 +1,35 @@
+{
+  "title": "Liora CamWard",
+  "description": "Detecta cámaras ocultas y micrófonos espía con técnicas reales: escaneo Bluetooth, detección óptica de lentes y análisis de campo magnético. Sin falsos positivos. Disponible en español, inglés, portugués y francés.",
+  "keywords": [
+    "Liora CamWard",
+    "detector de cámaras ocultas",
+    "cámara espía detector",
+    "detector de micrófonos ocultos",
+    "app anti cámaras espía",
+    "seguridad Airbnb",
+    "privacidad hotel",
+    "hidden camera detector",
+    "spy camera scanner",
+    "detector dispositivos espía",
+    "escaneo Bluetooth cámaras",
+    "detección óptica lentes",
+    "magnetómetro espía"
+  ],
+  "alternates": {
+    "canonical": "https://lioracamward.com"
+  },
+  "openGraph": {
+    "title": "Liora CamWard",
+    "description": "Detecta cámaras ocultas y micrófonos espía con técnicas reales: escaneo Bluetooth, detección óptica de lentes y análisis de campo magnético. Sin falsos positivos.",
+    "url": "https://lioracamward.com",
+    "siteName": "Liora CamWard",
+    "locale": "es_ES",
+    "type": "website"
+  },
+  "twitter": {
+    "card": "summary",
+    "title": "Liora CamWard",
+    "description": "Detecta cámaras ocultas y micrófonos espía con técnicas reales: Bluetooth, óptica de lente y magnetómetro. Sin falsos positivos."
+  }
+}
