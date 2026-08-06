@@ -17,11 +17,8 @@
       "buildNumber": "1",
       "supportsTablet": false,
       "infoPlist": {
-        "NSCameraUsageDescription": "Liora CamWard usa la cámara para buscar reflejos ópticos compatibles con lentes ocultas.",
-        "NSMicrophoneUsageDescription": "La cámara requiere acceso al micrófono en iOS.",
-        "NSLocationWhenInUseUsageDescription": "La ubicación se usa para correlacionar hallazgos espacialmente.",
-        "NSBluetoothAlwaysUsageDescription": "Liora CamWard escanea dispositivos Bluetooth cercanos para detectar posibles cámaras IP.",
-        "NSBluetoothPeripheralUsageDescription": "Se requiere para escanear dispositivos Bluetooth."
+        "NSCameraUsageDescription": "Liora CamWard usa la cámara como apoyo para una inspección visual manual del entorno.",
+        "NSBluetoothAlwaysUsageDescription": "Liora CamWard observa anuncios Bluetooth cercanos para mostrar equipos que requieren verificación manual."
       },
       "entitlements": {
         "com.apple.developer.associated-domains": []
@@ -30,7 +27,9 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
@@ -43,39 +42,55 @@
         "backgroundColor": "#0a0a0a"
       },
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.FLASHLIGHT",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_WIFI_STATE",
-        "android.permission.CHANGE_WIFI_STATE",
         "android.permission.INTERNET",
         "android.permission.VIBRATE"
       ],
-      "networkSecurityConfig": "./android-network-security-config.xml"
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
-      "expo-camera",
+      "expo-secure-store",
       [
-        "expo-sensors",
-        { "motionPermission": "Liora CamWard usa el magnetómetro para detectar fuentes magnéticas anómalas." }
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "neverForLocation": false,
+          "bluetoothAlwaysPermission": "Liora CamWard usa Bluetooth para observar equipos cercanos que requieren verificación manual."
+        }
       ],
       [
-        "expo-location",
-        { "locationWhenInUsePermission": "Usamos tu ubicación para correlacionar hallazgos espacialmente." }
+        "expo-camera",
+        {
+          "cameraPermission": "Liora CamWard usa la cámara como apoyo para la inspección visual del entorno.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Liora CamWard usa el magnetómetro para medir variaciones del campo magnético."
+        }
       ],
       [
         "react-native-permissions",
         {
-          "iosPermissions": ["BluetoothPeripheral", "Camera", "LocationWhenInUse", "Microphone"],
+          "iosPermissions": [
+            "Bluetooth",
+            "Camera"
+          ],
           "androidPermissions": [
-            "BLUETOOTH_SCAN", "BLUETOOTH_CONNECT", "ACCESS_FINE_LOCATION",
-            "CAMERA", "FLASHLIGHT"
+            "BLUETOOTH_SCAN",
+            "BLUETOOTH_CONNECT",
+            "ACCESS_FINE_LOCATION",
+            "CAMERA"
           ]
         }
       ]
