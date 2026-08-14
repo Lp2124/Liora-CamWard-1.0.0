@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 !.env.example
 .env
+.env.local
+.env.production
+.env.production.local
+.env.*.local
 
 # vercel
 .vercel
@@ -53,3 +57,11 @@ next-env.d.ts
 /remote-control/data/
 !/remote-control/data/.gitkeep
 
+# IDE
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
