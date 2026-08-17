@@ -21,11 +21,12 @@ export async function POST(request: Request) {
 
     const body = await readBodyJson<Record<string, unknown>>(request, MAX_BODY_BYTES);
     validateOpticalRequest(body);
+    const inspectionId = typeof body.inspectionId === 'string' ? body.inspectionId : undefined;
 
     const limit = await checkAndIncrementRateLimit(
       buildRateLimitKey({
         userId: user.openid,
-        sessionId: body.inspectionId,
+        sessionId: inspectionId,
         deviceFingerprint: typeof body.deviceFingerprint === 'string' ? body.deviceFingerprint : undefined,
         ip: requestIp(request),
         pathname: '/api/inspect/observations/optical',
