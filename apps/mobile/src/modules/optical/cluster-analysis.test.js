@@ -1,7 +1,7 @@
-const {
+import {
   aggregateOpticalPhase,
   compareTorchPhases,
-} = require('./cluster-analysis');
+} from './cluster-analysis';
 
 function frame(phase, index, x, y, brightness) {
   return {
