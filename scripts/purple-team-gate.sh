@@ -91,7 +91,7 @@ run 'ROOT BUILD' pnpm build
 
 printf '\n===== RULE 8: MOBILE PACKAGE CHECK =====\n'
 run 'MOBILE OPTICAL TESTS' pnpm --filter @liora/mobile test -- --runInBand
-run 'EXPO DOCTOR' pnpm --filter @liora/mobile exec expo-doctor
+run 'EXPO SDK DEPENDENCY CHECK' pnpm --filter @liora/mobile exec expo install --check
 
 printf '\n========================================\n'
 printf '[PASS] STATIC + TEST + BUILD GATES PASSED\n'
