@@ -32,7 +32,7 @@ test('MagneticAnalyzer — stable baseline returns normal_field', async () => {
   const { analyzeMagneticObservation } = await import(
     '../../packages/detection-core/src/magnetic-analyzer.js'
   );
-  const samples = makeSamples(40, 50, 1); // stable 50 µT
+  const samples = makeSamples(40, 50, 1);
   const result = analyzeMagneticObservation(samples);
   assert.equal(result.state, 'normal_field');
   assert.equal(result.calibrationValid, true);
@@ -52,7 +52,6 @@ test('MagneticAnalyzer — large positive spike returns magnetic_source_nearby',
   const { analyzeMagneticObservation } = await import(
     '../../packages/detection-core/src/magnetic-analyzer.js'
   );
-  // 30 stable samples baseline at 50 µT, then 10 spiked samples at 90 µT
   const baseline = makeSamples(30, 50, 0.5);
   const spike = makeSamples(10, 90, 0.5);
   const result = analyzeMagneticObservation([...baseline, ...spike]);
@@ -64,11 +63,9 @@ test('MagneticAnalyzer — DROP in field (negative delta) does NOT trigger alert
   const { analyzeMagneticObservation } = await import(
     '../../packages/detection-core/src/magnetic-analyzer.js'
   );
-  // Drop from 80 µT to 30 µT (−50 µT)
   const baseline = makeSamples(30, 80, 0.5);
   const drop = makeSamples(10, 30, 0.5);
   const result = analyzeMagneticObservation([...baseline, ...drop]);
-  // Negative delta should NOT be magnetic_source_nearby
   assert.notEqual(result.state, 'magnetic_source_nearby', `Negative delta must not be magnetic_source_nearby: ${result.explanation}`);
 });
 
@@ -76,7 +73,7 @@ test('MagneticAnalyzer — saturated sensor returns unstable_measurement', async
   const { analyzeMagneticObservation } = await import(
     '../../packages/detection-core/src/magnetic-analyzer.js'
   );
-  const samples = makeSamples(15, 450); // above 400 µT saturation threshold
+  const samples = makeSamples(15, 450);
   const result = analyzeMagneticObservation(samples);
   assert.equal(result.state, 'unstable_measurement');
   assert.equal(result.sensorSaturated, true);
@@ -86,10 +83,11 @@ test('MagneticAnalyzer — very noisy signal returns unstable_measurement', asyn
   const { analyzeMagneticObservation } = await import(
     '../../packages/detection-core/src/magnetic-analyzer.js'
   );
-  // Very high jitter relative to signal
   const samples = Array.from({ length: 30 }, (_, i) => ({
-    x: 0, y: 0, z: 50,
-    magnitude: 50 + (i % 2 === 0 ? 40 : -40), // alternates ±40 µT
+    x: 0,
+    y: 0,
+    z: 50,
+    magnitude: 50 + (i % 2 === 0 ? 40 : -40),
     ts: i * 100,
   }));
   const result = analyzeMagneticObservation(samples);
@@ -124,7 +122,7 @@ test('OpticalClassifier — insufficient frames returns insufficient_evidence', 
     captureMode: 'torch_on',
     brightnessEstimate: 0.5,
     torchActive: true,
-    frameCount: 2, // below minFramesForQuality = 4
+    frameCount: 2,
     hasSecondCapture: false,
   });
   assert.equal(result.verdict, 'insufficient_evidence');
@@ -137,10 +135,11 @@ test('OpticalClassifier — overexposed image returns insufficient_evidence', as
   const result = classifyOpticalObservation({
     clusters: [],
     captureMode: 'torch_on',
-    brightnessEstimate: 0.97, // above overexposureThreshold = 0.95
+    brightnessEstimate: 247,
     torchActive: true,
     frameCount: 10,
     hasSecondCapture: false,
+    overexposedRatio: 0.97,
   });
   assert.equal(result.verdict, 'insufficient_evidence');
   assert.equal(result.overexposed, true);
@@ -156,7 +155,7 @@ test('OpticalClassifier — low compactness cluster does NOT become suspected_de
       relativeX: 50,
       relativeY: 50,
       clusterSizePx: 30,
-      compactness: 0.05, // below compactnessMin 0.30 → filtered out
+      compactness: 0.05,
       maxBrightness: 255,
       saturation: 0.0,
     }],
@@ -173,13 +172,12 @@ test('OpticalClassifier — review_required has meetsThreshold false or confiden
   const { classifyOpticalObservation } = await import(
     '../../packages/detection-core/src/optical-classifier.js'
   );
-  // A cluster that passes size/compactness but is glass category (large px)
   const result = classifyOpticalObservation({
     clusters: [{
       persistedFrames: 8,
       relativeX: 50,
       relativeY: 50,
-      clusterSizePx: 250, // > 200 → 'glass' category, not camera-compatible
+      clusterSizePx: 250,
       compactness: 0.8,
       maxBrightness: 255,
       saturation: 0.0,
@@ -190,7 +188,6 @@ test('OpticalClassifier — review_required has meetsThreshold false or confiden
     frameCount: 10,
     hasSecondCapture: false,
   });
-  // glass category → not camera-compatible → review_required or clear, never suspected_device
   assert.ok(
     result.verdict === 'review_required' || result.verdict === 'clear',
     `Glass/large cluster must not be suspected_device, got ${result.verdict}`,
@@ -202,7 +199,6 @@ test('OpticalClassifier — review_required has meetsThreshold false or confiden
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('Risk: review_required must map to info severity (not suspicious)', () => {
-  // This tests the fix: verdictToSeverity('review_required') === 'info'
   function verdictToSeverity(verdict: string): string {
     switch (verdict) {
       case 'confirmed_device': return 'high';
@@ -278,7 +274,6 @@ test('computeRiskLevel — single high = high', async () => {
 
 test('computeRiskLevel — info + suspicious from different modules = low (not high)', async () => {
   const { computeRiskLevel } = await import('./risk.js');
-  // One info and one suspicious — only suspicious counts, from one module
   const result = computeRiskLevel([
     { module: 'magnetic', severity: 'info', title: 'Info', detail: '', evidence: {} },
     { module: 'optical', severity: 'suspicious', title: 'Alert', detail: '', evidence: {} },
@@ -344,7 +339,6 @@ test('CorrelationMatrix — optical+bluetooth is causally compatible', async () 
       observation: { source: 'ble', captureTimestamp: now },
     },
   );
-  // optical+bluetooth same spatial cell same time = should corroborate
   assert.equal(result.spatiallyProximate, true);
   assert.equal(result.temporallyProximate, true);
   assert.ok(result.correlationScore >= 0.55, `Score ${result.correlationScore} should be >= 0.55 for valid corroboration`);
@@ -366,7 +360,7 @@ test('CorrelationMatrix — same module evidence is never corroborated', async (
     },
     {
       evidenceId: 'b',
-      module: 'optical', // same module
+      module: 'optical',
       severity: 'suspicious',
       captureTimestamp: now,
       confidence: 0.9,
