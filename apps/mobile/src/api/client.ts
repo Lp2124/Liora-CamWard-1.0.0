@@ -6,8 +6,10 @@
  * AsyncStorage.
  */
 import type {
+  SubmitOpticalObservationRequest,
   SubmitMagneticObservationRequest,
   SubmitBleObservationRequest,
+  SubmitNetworkObservationRequest,
   ObservationAnalysisResponse,
   CreateInspectionRequest,
   InspectionResponse,
@@ -96,6 +98,16 @@ export async function listInspections(): Promise<InspectionResponse[]> {
   return apiFetch<InspectionResponse[]>('/api/scans');
 }
 
+export async function submitOpticalObservation(
+  req: SubmitOpticalObservationRequest,
+): Promise<ObservationAnalysisResponse> {
+  assertNoForbiddenFields(req, ['riskLevel', 'severity', 'verdict', 'riskScore', 'confidence']);
+  return apiFetch<ObservationAnalysisResponse>('/api/inspect/observations/optical', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
 export async function submitMagneticObservation(
   req: SubmitMagneticObservationRequest,
 ): Promise<ObservationAnalysisResponse> {
@@ -111,6 +123,16 @@ export async function submitBleObservation(
 ): Promise<ObservationAnalysisResponse> {
   assertNoForbiddenFields(req, ['riskLevel', 'severity', 'isCamera']);
   return apiFetch<ObservationAnalysisResponse>('/api/inspect/observations/ble', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function submitNetworkObservation(
+  req: SubmitNetworkObservationRequest,
+): Promise<ObservationAnalysisResponse> {
+  assertNoForbiddenFields(req, ['riskLevel', 'severity', 'cameraFound']);
+  return apiFetch<ObservationAnalysisResponse>('/api/inspect/observations/network', {
     method: 'POST',
     body: JSON.stringify(req),
   });
