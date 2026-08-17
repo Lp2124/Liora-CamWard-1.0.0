@@ -1,8 +1,8 @@
 /**
- * apps/mobile — Home Screen
+ * Liora CamWard — Home Screen
  *
- * Pantalla de inicio de Liora CamWard.
- * Describe con honestidad las capacidades y limitaciones.
+ * Production navigation only exposes modules that currently execute real
+ * end-to-end work on the device.
  */
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
@@ -14,43 +14,47 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <Text style={styles.title}>LIORA CAMWARD</Text>
-          <Text style={styles.subtitle}>Asistente de detección de anomalías</Text>
+          <Text style={styles.subtitle}>Asistente de inspección de anomalías</Text>
         </View>
 
         <View style={styles.disclaimer}>
-          <Text style={styles.disclaimerTitle}>⚠️ Información importante</Text>
+          <Text style={styles.disclaimerTitle}>Información importante</Text>
           <Text style={styles.disclaimerText}>
-            LIORA CAMWARD ayuda a identificar señales y anomalías que pueden requerir
-            inspección adicional. Ningún análisis basado únicamente en un teléfono puede
-            descartar todos los dispositivos ocultos.
+            Liora CamWard observa señales disponibles en el teléfono y presenta evidencia
+            que puede requerir inspección adicional. Una inspección móvil no puede descartar
+            todos los dispositivos ocultos.
           </Text>
           <Text style={styles.disclaimerText}>
-            Los resultados son indicativos, no concluyentes. Siempre verifica visualmente
-            cualquier hallazgo.
+            Los resultados describen evidencia observada; no constituyen una afirmación de
+            ausencia o presencia definitiva de una cámara.
           </Text>
         </View>
 
         <View style={styles.modules}>
-          <Text style={styles.modulesTitle}>Módulos de detección</Text>
-          <ModuleRow icon="📷" title="Óptico" description="Búsqueda de reflejos de lente con análisis diferencial" />
-          <ModuleRow icon="🧲" title="Magnético" description="Detección de fuentes magnéticas anómalas (evidencia secundaria)" />
-          <ModuleRow icon="📡" title="Bluetooth" description="Escaneo real BLE con base de firmas versionada" />
-          <ModuleRow icon="🌐" title="Red" description="Detección mDNS/SSDP/ONVIF donde el SO lo permita" />
+          <Text style={styles.modulesTitle}>Módulos activos</Text>
+          <ModuleRow
+            title="Análisis magnético"
+            description="Lecturas reales del magnetómetro; evidencia secundaria, nunca confirmación por sí sola."
+          />
+          <ModuleRow
+            title="Exploración Bluetooth"
+            description="Escaneo BLE nativo con RSSI, persistencia y clasificación en servidor."
+          />
         </View>
 
         <TouchableOpacity
           style={styles.startButton}
           onPress={() => router.push('/scan')}
-          accessibilityLabel="Iniciar escaneo"
+          accessibilityLabel="Iniciar inspección"
           accessibilityRole="button"
         >
-          <Text style={styles.startButtonText}>Iniciar escaneo</Text>
+          <Text style={styles.startButtonText}>Iniciar inspección</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.historyButton}
           onPress={() => router.push('/history')}
-          accessibilityLabel="Ver historial"
+          accessibilityLabel="Ver historial de inspecciones"
           accessibilityRole="button"
         >
           <Text style={styles.historyButtonText}>Historial de inspecciones</Text>
@@ -60,10 +64,9 @@ export default function HomeScreen() {
   );
 }
 
-function ModuleRow({ icon, title, description }: { icon: string; title: string; description: string }) {
+function ModuleRow({ title, description }: { title: string; description: string }) {
   return (
     <View style={styles.moduleRow}>
-      <Text style={styles.moduleIcon}>{icon}</Text>
       <View style={styles.moduleInfo}>
         <Text style={styles.moduleTitle}>{title}</Text>
         <Text style={styles.moduleDesc}>{description}</Text>
@@ -90,11 +93,10 @@ const styles = StyleSheet.create({
   disclaimerText: { fontSize: 13, color: '#aaa', lineHeight: 20, marginBottom: 6 },
   modules: { marginBottom: 32 },
   modulesTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 16 },
-  moduleRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
-  moduleIcon: { fontSize: 20, marginRight: 12, marginTop: 2 },
+  moduleRow: { marginBottom: 16 },
   moduleInfo: { flex: 1 },
   moduleTitle: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  moduleDesc: { fontSize: 12, color: '#666', marginTop: 2, lineHeight: 18 },
+  moduleDesc: { fontSize: 12, color: '#777', marginTop: 2, lineHeight: 18 },
   startButton: {
     backgroundColor: '#00ff88',
     borderRadius: 12,
@@ -110,5 +112,5 @@ const styles = StyleSheet.create({
     padding: 18,
     alignItems: 'center',
   },
-  historyButtonText: { fontSize: 14, color: '#666' },
+  historyButtonText: { fontSize: 14, color: '#aaa' },
 });
