@@ -39,6 +39,7 @@ if grep -RInE "$FORBIDDEN_PATTERN" "${EXISTING_DIRS[@]}" \
   --exclude-dir=build \
   --exclude='*.test.ts' \
   --exclude='*.test.tsx' \
+  --exclude='*.test.js' \
   --exclude='*.spec.ts' \
   --exclude='*.spec.tsx' \
   --exclude='*.snap'; then
@@ -78,11 +79,12 @@ run 'MOBILE TYPECHECK' pnpm --filter @liora/mobile typecheck
 run 'ROOT LINT' pnpm lint
 run 'MOBILE LINT' pnpm --filter @liora/mobile lint
 run 'UNIT / DETECTION TESTS' pnpm test
+run 'OPTICAL CLASSIFIER REGRESSION TESTS' node --import tsx --test lib/optical-classifier.test.ts
 run 'SECURITY TESTS' pnpm test:security
 run 'ROOT BUILD' pnpm build
 
 printf '\n===== RULE 8: MOBILE PACKAGE CHECK =====\n'
-run 'MOBILE TESTS' pnpm --filter @liora/mobile test -- --runInBand
+run 'MOBILE OPTICAL TESTS' pnpm --filter @liora/mobile test -- --runInBand
 
 printf '\n========================================\n'
 printf '[PASS] STATIC + TEST + BUILD GATES PASSED\n'
