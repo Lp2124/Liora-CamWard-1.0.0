@@ -14,7 +14,7 @@
     "build:ios:production": "eas build --platform ios --profile production",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "jest"
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "@liora/contracts": "workspace:*",
@@ -34,6 +34,7 @@
     "react-native": "0.79.6",
     "react-native-ble-plx": "^3.2.0",
     "react-native-permissions": "^5.0.0",
+    "react-native-safe-area-context": "5.4.0",
     "zod": "^3.24.1",
     "zustand": "^5.0.11"
   },
