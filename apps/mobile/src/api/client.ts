@@ -13,6 +13,7 @@ import type {
   ObservationAnalysisResponse,
   CreateInspectionRequest,
   InspectionResponse,
+  UploadOpticalEvidenceResponse,
 } from '@liora/contracts';
 
 class ApiConfigurationError extends Error {
@@ -67,6 +68,10 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     credentials: 'include',
   });
 
+  return readApiResponse<T>(response);
+}
+
+async function readApiResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let code = 'UNKNOWN_ERROR';
     let message = `HTTP ${response.status}`;
@@ -96,6 +101,43 @@ export async function createInspection(req: CreateInspectionRequest): Promise<In
 
 export async function listInspections(): Promise<InspectionResponse[]> {
   return apiFetch<InspectionResponse[]>('/api/scans');
+}
+
+export async function uploadOpticalEvidence(input: {
+  inspectionId: string;
+  captureNonce: string;
+  phase: 'torch_off' | 'torch_on';
+  uri: string;
+  expectedSha256: string;
+  expectedSizeBytes: number;
+}): Promise<UploadOpticalEvidenceResponse> {
+  const localResponse = await fetch(input.uri);
+  if (!localResponse.ok) throw new Error('OPTICAL_LOCAL_FILE_READ_FAILED');
+  const bytes = await localResponse.arrayBuffer();
+  if (bytes.byteLength !== input.expectedSizeBytes) {
+    throw new Error('OPTICAL_LOCAL_FILE_SIZE_CHANGED');
+  }
+
+  const query = new URLSearchParams({
+    inspectionId: input.inspectionId,
+    captureNonce: input.captureNonce,
+    phase: input.phase,
+  });
+  const response = await fetch(`${getApiBase()}/api/inspect/evidence/optical?${query.toString()}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'image/jpeg',
+    },
+    body: bytes,
+    credentials: 'include',
+  });
+  const result = await readApiResponse<UploadOpticalEvidenceResponse>(response);
+
+  if (result.sha256 !== input.expectedSha256 || result.sizeBytes !== input.expectedSizeBytes) {
+    throw new Error('OPTICAL_EVIDENCE_SERVER_HASH_MISMATCH');
+  }
+  return result;
 }
 
 export async function submitOpticalObservation(
