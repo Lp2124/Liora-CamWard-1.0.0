@@ -1,25 +1,24 @@
 /**
- * apps/mobile — API Client
+ * Liora CamWard — mobile API client.
  *
- * Cliente HTTP que envía observaciones crudas al servidor.
- * El servidor calcula riesgo, severidad, clasificación.
- *
- * Versión: 1.0.0
+ * The client submits raw observations only. Authentication is cookie-based when
+ * a valid native/web session exists; no bearer/session token is stored in
+ * AsyncStorage.
  */
-
 import type {
-  SubmitOpticalObservationRequest,
   SubmitMagneticObservationRequest,
   SubmitBleObservationRequest,
-  SubmitNetworkObservationRequest,
   ObservationAnalysisResponse,
   CreateInspectionRequest,
   InspectionResponse,
 } from '@liora/contracts';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://your-api.com';
-const SESSION_KEY = '__liora_session';
+class ApiConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ApiConfigurationError';
+  }
+}
 
 class ApiError extends Error {
   constructor(
@@ -32,44 +31,59 @@ class ApiError extends Error {
   }
 }
 
-async function getSessionToken(): Promise<string | null> {
-  return AsyncStorage.getItem(SESSION_KEY);
+function getApiBase(): string {
+  const configured = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (!configured) {
+    throw new ApiConfigurationError('EXPO_PUBLIC_API_URL no está configurada.');
+  }
+
+  let url: URL;
+  try {
+    url = new URL(configured);
+  } catch {
+    throw new ApiConfigurationError('EXPO_PUBLIC_API_URL no es una URL válida.');
+  }
+
+  const isLocalDev = url.hostname === '127.0.0.1' || url.hostname === 'localhost';
+  if (url.protocol !== 'https:' && !isLocalDev) {
+    throw new ApiConfigurationError('EXPO_PUBLIC_API_URL debe usar HTTPS fuera de desarrollo local.');
+  }
+
+  return url.origin;
 }
 
-async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const token = await getSessionToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    ...(options.headers as Record<string, string> ?? {}),
-  };
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  headers.set('Accept', 'application/json');
+  if (options.body !== undefined && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
-  if (token) headers['Cookie'] = `__Host-happyseeds_session=${token}`;
-
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${getApiBase()}${path}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
     let code = 'UNKNOWN_ERROR';
     let message = `HTTP ${response.status}`;
     try {
-      const body = await response.json() as { error?: { code?: string; message?: string } };
+      const body = (await response.json()) as { error?: { code?: string; message?: string } };
       code = body.error?.code ?? code;
       message = body.error?.message ?? message;
-    } catch { /* ignore */ }
+    } catch {
+      // Preserve the HTTP status when the response body is not JSON.
+    }
     throw new ApiError(response.status, code, message);
   }
 
-  const data = await response.json() as { success: boolean; data: T };
-  return data.data;
+  const envelope = (await response.json()) as { success?: boolean; data?: T };
+  if (envelope.success !== true || envelope.data === undefined) {
+    throw new ApiError(response.status, 'INVALID_API_RESPONSE', 'Respuesta API inválida.');
+  }
+  return envelope.data;
 }
-
-// ── Inspecciones ───────────────────────────────────────────────────────────────
 
 export async function createInspection(req: CreateInspectionRequest): Promise<InspectionResponse> {
   return apiFetch<InspectionResponse>('/api/scans', {
@@ -80,19 +94,6 @@ export async function createInspection(req: CreateInspectionRequest): Promise<In
 
 export async function listInspections(): Promise<InspectionResponse[]> {
   return apiFetch<InspectionResponse[]>('/api/scans');
-}
-
-// ── Observaciones crudas → servidor calcula todo ───────────────────────────────
-
-export async function submitOpticalObservation(
-  req: SubmitOpticalObservationRequest,
-): Promise<ObservationAnalysisResponse> {
-  // Validar que no se envíen campos prohibidos
-  assertNoForbiddenFields(req, ['riskLevel', 'severity', 'verdict', 'riskScore', 'confidence']);
-  return apiFetch<ObservationAnalysisResponse>('/api/inspect/observations/optical', {
-    method: 'POST',
-    body: JSON.stringify(req),
-  });
 }
 
 export async function submitMagneticObservation(
@@ -115,22 +116,12 @@ export async function submitBleObservation(
   });
 }
 
-export async function submitNetworkObservation(
-  req: SubmitNetworkObservationRequest,
-): Promise<ObservationAnalysisResponse> {
-  assertNoForbiddenFields(req, ['riskLevel', 'severity', 'cameraFound']);
-  return apiFetch<ObservationAnalysisResponse>('/api/inspect/observations/network', {
-    method: 'POST',
-    body: JSON.stringify(req),
-  });
-}
-
-function assertNoForbiddenFields(obj: object, forbidden: string[]): void {
-  for (const f of forbidden) {
-    if (f in obj) {
-      throw new Error(`[API Client] Campo prohibido '${f}' — el servidor lo calcula.`);
+function assertNoForbiddenFields(obj: object, forbidden: readonly string[]): void {
+  for (const field of forbidden) {
+    if (field in obj) {
+      throw new Error(`[API Client] Campo prohibido '${field}'; la autoridad es el servidor.`);
     }
   }
 }
 
-export { ApiError };
+export { ApiConfigurationError, ApiError };
