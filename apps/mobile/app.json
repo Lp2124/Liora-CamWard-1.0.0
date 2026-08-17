@@ -4,11 +4,11 @@
     "slug": "liora-camward",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "../../public/icons/icon-512.png",
     "userInterfaceStyle": "dark",
     "scheme": "lioracamward",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "../../public/icons/icon-512.png",
       "resizeMode": "contain",
       "backgroundColor": "#0a0a0a"
     },
@@ -37,7 +37,7 @@
       "package": "com.liora.camward",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "../../public/icons/icon-maskable-512.png",
         "backgroundColor": "#0a0a0a"
       },
       "permissions": [
@@ -50,8 +50,7 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.INTERNET",
         "android.permission.VIBRATE"
-      ],
-      "networkSecurityConfig": "./android-network-security-config.xml"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -72,7 +71,7 @@
       [
         "react-native-permissions",
         {
-          "iosPermissions": ["BluetoothPeripheral"],
+          "iosPermissions": ["Bluetooth"],
           "androidPermissions": [
             "BLUETOOTH_SCAN",
             "BLUETOOTH_CONNECT",
