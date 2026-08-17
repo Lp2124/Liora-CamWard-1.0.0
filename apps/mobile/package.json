@@ -48,6 +48,7 @@
   "jest": {
     "preset": "jest-expo",
     "testMatch": [
+      "**/*.test.js",
       "**/*.test.ts",
       "**/*.test.tsx"
     ]
