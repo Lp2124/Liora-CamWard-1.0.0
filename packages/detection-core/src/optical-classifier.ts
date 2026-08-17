@@ -66,7 +66,7 @@ export function classifyOpticalObservation(
       imageQualityOk: false,
       blurDetected,
       overexposed,
-      algorithmVersion: '1.1.0',
+      algorithmVersion: '1.1.1',
     };
   }
 
@@ -90,7 +90,7 @@ export function classifyOpticalObservation(
       imageQualityOk: true,
       blurDetected: false,
       overexposed: false,
-      algorithmVersion: '1.1.0',
+      algorithmVersion: '1.1.1',
     };
   }
 
@@ -101,7 +101,7 @@ export function classifyOpticalObservation(
   const rawConfidence = computeConfidence(primaryCluster, input, cfg);
   const differentialPassed =
     input.differentialDelta !== undefined &&
-    Math.abs(input.differentialDelta) >= cfg.differentialMinDelta;
+    input.differentialDelta >= cfg.differentialMinDelta;
   const verdict = assignVerdict(
     rawConfidence,
     cfg.confidenceThreshold,
@@ -125,7 +125,7 @@ export function classifyOpticalObservation(
     imageQualityOk: true,
     blurDetected: false,
     overexposed: false,
-    algorithmVersion: '1.1.0',
+    algorithmVersion: '1.1.1',
   };
 }
 
@@ -134,7 +134,7 @@ function score(value: number, threshold: number): ConfidenceScore {
     value,
     threshold,
     meetsThreshold: value >= threshold,
-    algorithmVersion: '1.1.0',
+    algorithmVersion: '1.1.1',
   };
 }
 
@@ -151,7 +151,7 @@ function computeConfidence(
   confidence += 0.10 * Math.max(0, 1 - cluster.saturation / cfg.maxSaturation);
   if (
     input.differentialDelta !== undefined &&
-    Math.abs(input.differentialDelta) >= cfg.differentialMinDelta
+    input.differentialDelta >= cfg.differentialMinDelta
   ) {
     confidence += 0.10;
   }
@@ -208,7 +208,7 @@ function buildVerdictExplanation(
     case 'suspected_device':
       return `${base} El patrón es compatible con un reflector óptico pequeño y persistente. ${
         differentialPassed
-          ? 'Se observó una diferencia de brillo OFF/ON por encima del umbral configurado.'
+          ? 'Se observó un aumento de brillo OFF→ON por encima del umbral configurado.'
           : ''
       } Corrobora con otra modalidad y verifica físicamente.`;
     case 'confirmed_device':
