@@ -19,34 +19,35 @@ export interface DetectionConfig {
 }
 
 export interface OpticalConfig {
-  brightnessThreshold: number;    // 0-255
+  brightnessThreshold: number;
   minClusterPx: number;
   maxClusterPx: number;
   persistFramesRequired: number;
   compactnessMin: number;
   maxSaturation: number;
-  confidenceThreshold: number;    // 0.0-1.0
-  overexposureThreshold: number;  // 0-1 normalized brightness
+  confidenceThreshold: number;
+  overexposureThreshold: number;
   minFramesForQuality: number;
-  differentialMinDelta: number;   // diferencia mínima torch_on vs torch_off
+  minSharpnessVariance: number;
+  differentialMinDelta: number;
 }
 
 export interface MagneticConfig {
   baselineSampleMs: number;
   anomalyDeltaUt: number;
   anomalyConfirmCount: number;
-  madMultiplier: number;          // umbral = mediana + MAD * multiplier
+  madMultiplier: number;
   baselineDriftCalm: number;
   baselineDriftActive: number;
   spatialGradientThreshold: number;
-  saturationThreshold: number;    // máximo µT antes de considerar sensor saturado
+  saturationThreshold: number;
   minCalibrationSamples: number;
 }
 
 export interface BleConfig {
-  minRssiForProximity: number;    // dBm, más negativo = más lejos
+  minRssiForProximity: number;
   persistenceMinOccurrences: number;
-  rssiVariationWindow: number;    // número de lecturas para calcular variación
+  rssiVariationWindow: number;
   whitelistFamiliarDevices: boolean;
 }
 
@@ -86,6 +87,7 @@ export const DEFAULT_DETECTION_CONFIG: DetectionConfig = {
     confidenceThreshold: 0.65,
     overexposureThreshold: 0.95,
     minFramesForQuality: 4,
+    minSharpnessVariance: 8,
     differentialMinDelta: 30,
   },
   magnetic: {

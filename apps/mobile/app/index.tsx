@@ -1,11 +1,5 @@
-/**
- * apps/mobile — Home Screen
- *
- * Pantalla de inicio de Liora CamWard.
- * Describe con honestidad las capacidades y limitaciones.
- */
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
@@ -14,101 +8,100 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <Text style={styles.title}>LIORA CAMWARD</Text>
-          <Text style={styles.subtitle}>Asistente de detección de anomalías</Text>
+          <Text style={styles.subtitle}>Inspección modular de señales y anomalías</Text>
         </View>
 
         <View style={styles.disclaimer}>
-          <Text style={styles.disclaimerTitle}>⚠️ Información importante</Text>
+          <Text style={styles.disclaimerTitle}>Alcance de los resultados</Text>
           <Text style={styles.disclaimerText}>
-            LIORA CAMWARD ayuda a identificar señales y anomalías que pueden requerir
-            inspección adicional. Ningún análisis basado únicamente en un teléfono puede
-            descartar todos los dispositivos ocultos.
-          </Text>
-          <Text style={styles.disclaimerText}>
-            Los resultados son indicativos, no concluyentes. Siempre verifica visualmente
-            cualquier hallazgo.
+            Cada módulo observa únicamente la evidencia que su sensor o interfaz puede medir.
+            Ningún módulo, ni la inspección integral, puede afirmar por sí solo que un lugar
+            está libre de dispositivos ocultos.
           </Text>
         </View>
 
-        <View style={styles.modules}>
-          <Text style={styles.modulesTitle}>Módulos de detección</Text>
-          <ModuleRow icon="📷" title="Óptico" description="Búsqueda de reflejos de lente con análisis diferencial" />
-          <ModuleRow icon="🧲" title="Magnético" description="Detección de fuentes magnéticas anómalas (evidencia secundaria)" />
-          <ModuleRow icon="📡" title="Bluetooth" description="Escaneo real BLE con base de firmas versionada" />
-          <ModuleRow icon="🌐" title="Red" description="Detección mDNS/SSDP/ONVIF donde el SO lo permita" />
+        <Text style={styles.sectionTitle}>Módulos independientes</Text>
+
+        <ModuleButton
+          title="Exploración Bluetooth"
+          description="Escaneo BLE nativo, RSSI, persistencia y dispositivos observados."
+          route="/ble"
+        />
+
+        <ModuleButton
+          title="Detección Magnética"
+          description="Lectura física del magnetómetro, baseline, delta y calidad de señal."
+          route="/magnetic"
+        />
+
+        <View style={styles.pendingCard}>
+          <Text style={styles.pendingTitle}>Análisis Óptico</Text>
+          <Text style={styles.pendingText}>
+            Motor separado preservado. No se expone como botón hasta completar análisis real de píxeles y prueba física.
+          </Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={() => router.push('/scan')}
-          accessibilityLabel="Iniciar escaneo"
-          accessibilityRole="button"
-        >
-          <Text style={styles.startButtonText}>Iniciar escaneo</Text>
-        </TouchableOpacity>
+        <View style={styles.pendingCard}>
+          <Text style={styles.pendingTitle}>Análisis de Red</Text>
+          <Text style={styles.pendingText}>
+            Motor separado reservado. No se expone como botón hasta implementar descubrimiento real de red en móvil y validarlo en hardware.
+          </Text>
+        </View>
 
-        <TouchableOpacity
-          style={styles.historyButton}
-          onPress={() => router.push('/history')}
-          accessibilityLabel="Ver historial"
-          accessibilityRole="button"
-        >
-          <Text style={styles.historyButtonText}>Historial de inspecciones</Text>
-        </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Inspección combinada</Text>
+
+        <ModuleButton
+          title="Inspección Integral"
+          description="Coordinador que reutiliza los motores disponibles sin duplicar su lógica."
+          route="/integral"
+          primary
+        />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function ModuleRow({ icon, title, description }: { icon: string; title: string; description: string }) {
+function ModuleButton({
+  title,
+  description,
+  route,
+  primary = false,
+}: {
+  title: string;
+  description: string;
+  route: Href;
+  primary?: boolean;
+}) {
   return (
-    <View style={styles.moduleRow}>
-      <Text style={styles.moduleIcon}>{icon}</Text>
-      <View style={styles.moduleInfo}>
-        <Text style={styles.moduleTitle}>{title}</Text>
-        <Text style={styles.moduleDesc}>{description}</Text>
-      </View>
-    </View>
+    <TouchableOpacity
+      style={[styles.moduleButton, primary && styles.primaryButton]}
+      onPress={() => router.push(route)}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+    >
+      <Text style={[styles.moduleButtonTitle, primary && styles.primaryTitle]}>{title}</Text>
+      <Text style={[styles.moduleButtonDescription, primary && styles.primaryDescription]}>{description}</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0a' },
-  scroll: { padding: 24, paddingBottom: 48 },
-  header: { alignItems: 'center', marginBottom: 32, marginTop: 16 },
-  title: { fontSize: 28, fontWeight: '900', color: '#00ff88', letterSpacing: 4 },
-  subtitle: { fontSize: 14, color: '#888', marginTop: 8, letterSpacing: 1 },
-  disclaimer: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderLeftWidth: 3,
-    borderLeftColor: '#ff8800',
-  },
-  disclaimerTitle: { fontSize: 13, fontWeight: '700', color: '#ff8800', marginBottom: 8 },
-  disclaimerText: { fontSize: 13, color: '#aaa', lineHeight: 20, marginBottom: 6 },
-  modules: { marginBottom: 32 },
-  modulesTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 16 },
-  moduleRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
-  moduleIcon: { fontSize: 20, marginRight: 12, marginTop: 2 },
-  moduleInfo: { flex: 1 },
-  moduleTitle: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  moduleDesc: { fontSize: 12, color: '#666', marginTop: 2, lineHeight: 18 },
-  startButton: {
-    backgroundColor: '#00ff88',
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  startButtonText: { fontSize: 16, fontWeight: '800', color: '#0a0a0a', letterSpacing: 1 },
-  historyButton: {
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-  },
-  historyButtonText: { fontSize: 14, color: '#666' },
+  scroll: { padding: 20, paddingBottom: 48 },
+  header: { alignItems: 'center', marginTop: 14, marginBottom: 24 },
+  title: { fontSize: 27, fontWeight: '900', color: '#00ff88', letterSpacing: 3 },
+  subtitle: { color: '#888', marginTop: 8, fontSize: 13, textAlign: 'center' },
+  disclaimer: { backgroundColor: '#151515', borderRadius: 12, padding: 15, borderLeftWidth: 3, borderLeftColor: '#ff8800', marginBottom: 24 },
+  disclaimerTitle: { color: '#ff9f32', fontSize: 13, fontWeight: '800', marginBottom: 7 },
+  disclaimerText: { color: '#aaa', fontSize: 12, lineHeight: 18 },
+  sectionTitle: { color: '#fff', fontSize: 15, fontWeight: '800', marginBottom: 12, marginTop: 4 },
+  moduleButton: { backgroundColor: '#111', borderWidth: 1, borderColor: '#242424', borderRadius: 12, padding: 16, marginBottom: 12 },
+  moduleButtonTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  moduleButtonDescription: { color: '#777', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  primaryButton: { backgroundColor: '#00ff88', borderColor: '#00ff88' },
+  primaryTitle: { color: '#07110c' },
+  primaryDescription: { color: '#123322' },
+  pendingCard: { borderWidth: 1, borderColor: '#252525', borderRadius: 12, padding: 16, marginBottom: 12 },
+  pendingTitle: { color: '#888', fontSize: 15, fontWeight: '800' },
+  pendingText: { color: '#5f5f5f', fontSize: 12, lineHeight: 18, marginTop: 5 },
 });

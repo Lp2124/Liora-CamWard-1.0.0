@@ -15,7 +15,6 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { randomBytes } from 'crypto';
 
 // ── CORS allowlist ─────────────────────────────────────────────────────────────
 // Fully-qualified origins. Add lioracamward.com once DNS propagates.
@@ -54,9 +53,9 @@ function isAllowedOrigin(origin: string | null): boolean {
 // ── Edge rate limiter (first-line flood prevention only) ──────────────────────
 // Authoritative distributed check is in lib/rate-limit.ts (PostgreSQL).
 const edgeMap = new Map<string, { count: number; windowStart: number }>();
-const EDGE_WINDOW_MS  = 60_000;
-const EDGE_MAX_DEFAULT = 120;  // generous — real limit enforced in route handler
-const EDGE_MAX_OBS     = 40;   // tighter for observation routes
+const EDGE_WINDOW_MS = 60_000;
+const EDGE_MAX_DEFAULT = 120; // generous — real limit enforced in route handler
+const EDGE_MAX_OBS = 40; // tighter for observation routes
 
 function edgeCheck(key: string, max: number): boolean {
   const now = Date.now();
@@ -65,7 +64,9 @@ function edgeCheck(key: string, max: number): boolean {
     edgeMap.set(key, { count: 1, windowStart: now });
     if (edgeMap.size > 20_000) {
       const cutoff = now - EDGE_WINDOW_MS * 2;
-      for (const [k, v] of edgeMap) { if (v.windowStart < cutoff) edgeMap.delete(k); }
+      for (const [k, v] of edgeMap) {
+        if (v.windowStart < cutoff) edgeMap.delete(k);
+      }
     }
     return true;
   }
@@ -85,45 +86,47 @@ function clientIp(req: NextRequest): string {
 
 // ── CSP nonce ─────────────────────────────────────────────────────────────────
 function generateNonce(): string {
-  return randomBytes(16).toString('base64');
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function buildCsp(nonce: string): string {
   const directives = [
-    `default-src 'self'`,
+    "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}'`,
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
-    `font-src 'self' https://fonts.gstatic.com`,
-    `img-src 'self' data: blob:`,
-    `connect-src 'self'`,
-    `media-src 'self' blob:`,
-    `worker-src 'self' blob:`,
-    `frame-ancestors 'none'`,
-    `object-src 'none'`,
-    `base-uri 'self'`,
-    `form-action 'self'`,
-    `upgrade-insecure-requests`,
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    'upgrade-insecure-requests',
   ];
   return directives.join('; ');
 }
 
 // ── Main middleware ───────────────────────────────────────────────────────────
 export function middleware(request: NextRequest) {
-  const { pathname, protocol } = request.nextUrl;
-  const isApi    = pathname.startsWith('/api/');
-  const method   = request.method.toUpperCase();
-  const origin   = request.headers.get('origin');
-  const ip       = clientIp(request);
+  const { pathname } = request.nextUrl;
+  const isApi = pathname.startsWith('/api/');
+  const method = request.method.toUpperCase();
+  const origin = request.headers.get('origin');
+  const ip = clientIp(request);
 
   // ── 1. HTTPS enforcement ───────────────────────────────────────────────────
   // Only trust x-forwarded-proto / x-client-proto from platform proxy.
   // Use 308 for mutation methods (preserves body), 301 for GET/HEAD/OPTIONS.
   const proto = request.headers.get('x-forwarded-proto')
-             ?? request.headers.get('x-client-proto');
+    ?? request.headers.get('x-client-proto');
   if (proto === 'http') {
     const url = request.nextUrl.clone();
     url.protocol = 'https:';
-    const redirectStatus = (['GET', 'HEAD', 'OPTIONS'].includes(method)) ? 301 : 308;
+    const redirectStatus = ['GET', 'HEAD', 'OPTIONS'].includes(method) ? 301 : 308;
     return NextResponse.redirect(url, { status: redirectStatus });
   }
 
@@ -136,7 +139,7 @@ export function middleware(request: NextRequest) {
         'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, x-csrf-token, x-device-fingerprint',
         'Access-Control-Max-Age': '86400',
-        'Vary': 'Origin',
+        Vary: 'Origin',
       };
       if (origin && originAllowed) {
         headers['Access-Control-Allow-Origin'] = origin;
@@ -150,7 +153,7 @@ export function middleware(request: NextRequest) {
     if (origin && !originAllowed) {
       return NextResponse.json(
         { success: false, error: 'CORS_REJECTED' },
-        { status: 403, headers: { 'Vary': 'Origin' } },
+        { status: 403, headers: { Vary: 'Origin' } },
       );
     }
   }
@@ -158,18 +161,18 @@ export function middleware(request: NextRequest) {
   // ── 3. Edge rate limiting (flood prevention — first layer only) ────────────
   if (isApi && method !== 'GET' && method !== 'OPTIONS') {
     const isObs = pathname.startsWith('/api/inspect/observations/');
-    const max   = isObs ? EDGE_MAX_OBS : EDGE_MAX_DEFAULT;
+    const max = isObs ? EDGE_MAX_OBS : EDGE_MAX_DEFAULT;
     const edgeKey = `${ip}|${isObs ? 'obs' : 'api'}`;
     if (!edgeCheck(edgeKey, max)) {
       return NextResponse.json(
         { success: false, error: 'RATE_LIMIT_EXCEEDED' },
-        { status: 429, headers: { 'Retry-After': '60', 'Vary': 'Origin' } },
+        { status: 429, headers: { 'Retry-After': '60', Vary: 'Origin' } },
       );
     }
   }
 
   // ── 4. Build response with security headers ────────────────────────────────
-  const nonce    = generateNonce();
+  const nonce = generateNonce();
   const response = NextResponse.next({
     request: { headers: new Headers({ ...Object.fromEntries(request.headers), 'x-nonce': nonce }) },
   });

@@ -19,7 +19,8 @@ interface NetworkInformationLike {
 
 /**
  * Real, browser-safe network reconnaissance. A browser sandbox cannot open
- * raw TCP sockets or port-scan a LAN — no fake port scanner is built here.
+ * raw TCP sockets or perform a LAN port scan, so this module does not claim
+ * to provide that capability.
  *
  * What IS real and useful:
  *  - WebRTC local ICE candidates, which reveal the device's actual subnet.
