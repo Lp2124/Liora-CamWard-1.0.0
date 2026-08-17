@@ -20,8 +20,8 @@ import {
 import { toast } from 'sonner';
 
 const RISK_LABEL: Record<string, string> = {
-  clear: 'Sin amenazas detectadas', low: 'Riesgo bajo',
-  medium: 'Riesgo medio', high: 'RIESGO ALTO — POSIBLE CÁMARA',
+  clear: 'Sin señales de riesgo sobre umbral', low: 'Riesgo bajo',
+  medium: 'Riesgo medio', high: 'RIESGO ALTO — REQUIERE INSPECCIÓN',
 };
 const RISK_COLOR: Record<string, string> = {
   clear: 'text-green-400', low: 'text-yellow-400', medium: 'text-orange-400', high: 'text-red-400',
@@ -37,13 +37,15 @@ function exportReport(findings: Finding[], riskLevel: string) {
     '',
     '─────────────────────────────────────',
     ...findings.flatMap((f, i) => [
-      `[${i+1}] ${f.severity.toUpperCase()} · ${f.module}`,
+      `[${i + 1}] ${f.severity.toUpperCase()} · ${f.module}`,
       `  ${f.title}`,
       `  ${f.detail}`,
       `  Evidencia: ${JSON.stringify(f.evidence)}`,
       '',
     ]),
-    findings.length === 0 ? 'Sin hallazgos sospechosos.' : '',
+    findings.length === 0
+      ? 'No hubo hallazgos que superaran los umbrales configurados. Esto no descarta dispositivos no observados.'
+      : '',
     '─────────────────────────────────────',
     'Liora CamWard · https://lioracamward.com',
   ];
@@ -51,7 +53,7 @@ function exportReport(findings: Finding[], riskLevel: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `liora-camward-${new Date().toISOString().slice(0,10)}.txt`;
+  a.download = `liora-camward-${new Date().toISOString().slice(0, 10)}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -61,8 +63,6 @@ export default function ScanPage() {
   const { user, login } = useAuth();
   const router = useRouter();
 
-  // The video element lives permanently in the DOM so the ref is always valid
-  // when startOpticalScan is called. It's just hidden/shown via CSS.
   const videoRef = useRef<HTMLVideoElement>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -78,10 +78,12 @@ export default function ScanPage() {
 
   const { availability, modules, findings, riskLevel, isScanning, error, opticalProgress, magneticProgress } = state;
 
-  // ── session ───────────────────────────────────────────────────────────────
   const ensureSession = useCallback(async (): Promise<string | null> => {
     if (sessionId) return sessionId;
-    if (!user) { login(); return null; }
+    if (!user) {
+      login();
+      return null;
+    }
     const res = await fetch('/api/scans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,13 +111,22 @@ export default function ScanPage() {
         body: JSON.stringify({ riskLevel, modulesRun, findings }),
       });
       const payload = await res.json();
-      if (payload.success) { toast.success(t('reportSaved')); router.push(`/history/${sessionId}`); }
-      else toast.error(payload.error ?? 'Error al guardar');
-    } finally { setSaving(false); }
+      if (payload.success) {
+        toast.success(t('reportSaved'));
+        router.push(`/history/${sessionId}`);
+      } else {
+        toast.error(payload.error ?? 'Error al guardar');
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const withSession = useCallback(async (action: () => Promise<void>) => {
-    if (!user) { login(); return; }
+    if (!user) {
+      login();
+      return;
+    }
     const id = await ensureSession();
     if (!id) return;
     await action();
@@ -136,7 +147,6 @@ export default function ScanPage() {
 
   const mf = (mod: string) => findings.filter((f) => f.module === mod);
 
-  // ── Magnetic live bar ─────────────────────────────────────────────────────
   const MagneticLive = () => {
     if (!modules.magnetic.running || !magneticProgress) return null;
     const { phase, currentMicroTesla, baselineMicroTesla, signedDelta, secondsRemaining } = magneticProgress;
@@ -160,7 +170,6 @@ export default function ScanPage() {
                 )}
               </span>
             </div>
-            {/* Live delta bar */}
             <div className="h-2 w-full overflow-hidden rounded-full bg-border/40">
               <div
                 className={`h-full rounded-full transition-all duration-200 ${danger ? 'bg-amber-400' : 'bg-violet-400'}`}
@@ -176,7 +185,6 @@ export default function ScanPage() {
     );
   };
 
-  // ── Optical live status ───────────────────────────────────────────────────
   const OpticalLive = () => {
     if (!modules.optical.running) return null;
     return (
@@ -205,17 +213,9 @@ export default function ScanPage() {
     <div className="min-h-screen">
       <AppNav />
 
-      {/* ── VIDEO SIEMPRE EN EL DOM ──────────────────────────────────────────
-          Critical: the ref must be valid when startOpticalScan runs.
-          We keep the <video> mounted at all times and show/hide it via CSS.
-      ──────────────────────────────────────────────────────────────────── */}
-      <div className={modules.optical.running ? 'block' : 'hidden'} aria-hidden={!modules.optical.running}>
-        {/* This outer div is just for positioning — rendered inside the card below */}
-      </div>
+      <div className={modules.optical.running ? 'block' : 'hidden'} aria-hidden={!modules.optical.running} />
 
       <main className="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-8">
-
-        {/* Hero */}
         <div className="relative overflow-hidden rounded-2xl">
           <img src="/hero-bg.png" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/40 to-background/90" />
@@ -225,18 +225,16 @@ export default function ScanPage() {
           </div>
         </div>
 
-        {/* Radar */}
         <RadarDisplay active={isScanning} riskLevel={riskLevel} findingCount={findings.length} />
         <p className={`text-center font-display text-sm font-semibold uppercase tracking-widest ${RISK_COLOR[riskLevel]}`}>
           {RISK_LABEL[riskLevel]}
-          {findings.filter(f => f.severity !== 'info').length > 0 && (
+          {findings.filter((f) => f.severity !== 'info').length > 0 && (
             <Badge variant="outline" className="ml-2 text-xs">
-              {findings.filter(f => f.severity !== 'info').length} evidencia{findings.filter(f => f.severity !== 'info').length !== 1 ? 's' : ''}
+              {findings.filter((f) => f.severity !== 'info').length} evidencia{findings.filter((f) => f.severity !== 'info').length !== 1 ? 's' : ''}
             </Badge>
           )}
         </p>
 
-        {/* Controls */}
         <div className="flex flex-col items-center gap-2">
           {!isScanning ? (
             <Button size="lg" onClick={handleStartAll} className="w-full max-w-xs gap-2">
@@ -249,16 +247,22 @@ export default function ScanPage() {
             </Button>
           )}
           {findings.length > 0 && (
-            <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground"
-              onClick={() => { exportReport(findings, riskLevel); toast.success('Informe descargado'); }}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 text-muted-foreground"
+              onClick={() => {
+                exportReport(findings, riskLevel);
+                toast.success('Informe descargado');
+              }}
+            >
               <FileDown className="size-3.5" aria-hidden /> Exportar informe
             </Button>
           )}
         </div>
 
-        {/* Multi-module alert */}
         {riskLevel === 'high' && (() => {
-          const alertMods = new Set(findings.filter(f => f.severity !== 'info').map(f => f.module));
+          const alertMods = new Set(findings.filter((f) => f.severity !== 'info').map((f) => f.module));
           if (alertMods.size >= 2) return (
             <Alert className="border-red-500/40 bg-red-500/5">
               <ShieldAlert className="size-4 text-red-400" aria-hidden />
@@ -279,13 +283,10 @@ export default function ScanPage() {
           </Alert>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════════
-            1. CÁMARA ÓPTICA
-        ═══════════════════════════════════════════════════════════════ */}
         <div className={`rounded-2xl border bg-card/60 transition-colors ${
           modules.optical.running ? 'border-cyan-500/60 shadow-[0_0_20px_-4px_rgba(6,182,212,0.4)]'
-          : mf('optical').some(f => f.severity !== 'info') ? 'border-amber-500/50'
-          : 'border-border/40'
+            : mf('optical').some((f) => f.severity !== 'info') ? 'border-amber-500/50'
+              : 'border-border/40'
         }`}>
           <div className="flex items-start justify-between gap-3 p-4">
             <div className="flex items-center gap-3">
@@ -297,8 +298,8 @@ export default function ScanPage() {
                   <h2 className="font-display font-semibold">Cámara óptica</h2>
                   {modules.optical.running && <ActiveBadge />}
                   {modules.optical.done && !modules.optical.running && (
-                    mf('optical').some(f => f.severity !== 'info')
-                      ? <SuspiciousBadge count={mf('optical').filter(f => f.severity !== 'info').length} />
+                    mf('optical').some((f) => f.severity !== 'info')
+                      ? <SuspiciousBadge count={mf('optical').filter((f) => f.severity !== 'info').length} />
                       : <ClearBadge />
                   )}
                 </div>
@@ -308,20 +309,22 @@ export default function ScanPage() {
             {!availability.optical.supported ? (
               <UnavailablePill />
             ) : modules.optical.running ? (
-              <Button size="sm" variant="outline" onClick={stopOptical}
-                className="shrink-0 gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={stopOptical}
+                className="shrink-0 gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
+              >
                 <Square className="size-3" /> Detener
               </Button>
             ) : (
-              <Button size="sm" onClick={() => withSession(startOptical)} disabled={modules.optical.running}
-                className="shrink-0 gap-1.5">
+              <Button size="sm" onClick={() => withSession(startOptical)} disabled={modules.optical.running} className="shrink-0 gap-1.5">
                 {modules.optical.done ? <Plus className="size-3" /> : <Play className="size-3" />}
                 {modules.optical.done ? 'Reiniciar' : 'Iniciar'}
               </Button>
             )}
           </div>
 
-          {/* Video — always in DOM, shown via CSS */}
           <div className={`relative mx-4 mb-4 overflow-hidden rounded-xl bg-black ${modules.optical.running ? 'block' : 'hidden'}`}>
             <video
               ref={videoRef}
@@ -342,11 +345,13 @@ export default function ScanPage() {
               Funciona mejor en habitaciones con poca luz y moviendo el teléfono despacio.
             </p>
           )}
-          {modules.optical.done && !modules.optical.running && mf('optical').some(f => f.severity !== 'info') && (
+          {modules.optical.done && !modules.optical.running && mf('optical').some((f) => f.severity !== 'info') && (
             <div className="mx-4 mb-4"><OpticalMap findings={findings} /></div>
           )}
-          {modules.optical.done && !modules.optical.running && !mf('optical').some(f => f.severity !== 'info') && (
-            <p className="px-4 pb-4 text-xs text-muted-foreground">No se detectaron reflejos de lente. Área sin anomalías ópticas.</p>
+          {modules.optical.done && !modules.optical.running && !mf('optical').some((f) => f.severity !== 'info') && (
+            <p className="px-4 pb-4 text-xs text-muted-foreground">
+              No se observaron reflejos persistentes por encima del umbral durante esta captura. Esto no descarta dispositivos ocultos o fuera del campo de visión.
+            </p>
           )}
           {mf('optical').length > 0 && (
             <div className="flex flex-col gap-2 border-t border-border/40 p-4">
@@ -355,13 +360,10 @@ export default function ScanPage() {
           )}
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            2. MAGNETÓMETRO
-        ═══════════════════════════════════════════════════════════════ */}
         <div className={`rounded-2xl border bg-card/60 transition-colors ${
           modules.magnetic.running ? 'border-violet-500/60 shadow-[0_0_20px_-4px_rgba(139,92,246,0.4)]'
-          : mf('magnetic').some(f => f.severity !== 'info') ? 'border-amber-500/50'
-          : 'border-border/40'
+            : mf('magnetic').some((f) => f.severity !== 'info') ? 'border-amber-500/50'
+              : 'border-border/40'
         }`}>
           <div className="flex items-start justify-between gap-3 p-4">
             <div className="flex items-center gap-3">
@@ -373,14 +375,14 @@ export default function ScanPage() {
                   <h2 className="font-display font-semibold">Sensor magnético</h2>
                   {modules.magnetic.running && <ActiveBadge color="violet" />}
                   {modules.magnetic.done && !modules.magnetic.running && (
-                    mf('magnetic').some(f => f.severity !== 'info')
-                      ? <SuspiciousBadge count={mf('magnetic').filter(f => f.severity !== 'info').length} />
+                    mf('magnetic').some((f) => f.severity !== 'info')
+                      ? <SuspiciousBadge count={mf('magnetic').filter((f) => f.severity !== 'info').length} />
                       : <ClearBadge />
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {availability.magnetic.supported
-                    ? 'Detecta anomalías de campo magnético causadas por electrónica oculta'
+                    ? 'Detecta anomalías de campo magnético causadas por electrónica cercana'
                     : 'Requiere Chrome en Android con Generic Sensor API'}
                 </p>
               </div>
@@ -388,13 +390,16 @@ export default function ScanPage() {
             {!availability.magnetic.supported ? (
               <UnavailablePill />
             ) : modules.magnetic.running ? (
-              <Button size="sm" variant="outline" onClick={stopMagnetic}
-                className="shrink-0 gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={stopMagnetic}
+                className="shrink-0 gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
+              >
                 <Square className="size-3" /> Detener
               </Button>
             ) : (
-              <Button size="sm" onClick={() => withSession(startMagnetic)} disabled={modules.magnetic.running}
-                className="shrink-0 gap-1.5">
+              <Button size="sm" onClick={() => withSession(startMagnetic)} disabled={modules.magnetic.running} className="shrink-0 gap-1.5">
                 {modules.magnetic.done ? <Plus className="size-3" /> : <Play className="size-3" />}
                 {modules.magnetic.done ? 'Reiniciar' : 'Iniciar'}
               </Button>
@@ -409,8 +414,10 @@ export default function ScanPage() {
               cerca de enchufes, detrás de cuadros, detectores de humo y marcos metálicos.
             </p>
           )}
-          {modules.magnetic.done && !modules.magnetic.running && !mf('magnetic').some(f => f.severity !== 'info') && (
-            <p className="px-4 pb-4 text-xs text-muted-foreground">Sin anomalías magnéticas detectadas.</p>
+          {modules.magnetic.done && !modules.magnetic.running && !mf('magnetic').some((f) => f.severity !== 'info') && (
+            <p className="px-4 pb-4 text-xs text-muted-foreground">
+              No se observaron variaciones magnéticas por encima del umbral durante esta medición; el resultado no identifica ni descarta dispositivos por sí solo.
+            </p>
           )}
           {mf('magnetic').length > 0 && (
             <div className="flex flex-col gap-2 border-t border-border/40 p-4">
@@ -419,12 +426,7 @@ export default function ScanPage() {
           )}
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            3. RED WiFi
-        ═══════════════════════════════════════════════════════════════ */}
-        <div className={`rounded-2xl border bg-card/60 ${
-          modules.network.running ? 'border-blue-500/60' : 'border-border/40'
-        }`}>
+        <div className={`rounded-2xl border bg-card/60 ${modules.network.running ? 'border-blue-500/60' : 'border-border/40'}`}>
           <div className="flex items-start justify-between gap-3 p-4">
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600">
@@ -455,13 +457,10 @@ export default function ScanPage() {
           )}
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            4. BLUETOOTH
-        ═══════════════════════════════════════════════════════════════ */}
         <div className={`rounded-2xl border bg-card/60 ${
           modules.bluetooth.running ? 'border-indigo-500/60'
-          : mf('bluetooth').some(f => f.severity !== 'info') ? 'border-amber-500/50'
-          : 'border-border/40'
+            : mf('bluetooth').some((f) => f.severity !== 'info') ? 'border-amber-500/50'
+              : 'border-border/40'
         }`}>
           <div className="flex items-start justify-between gap-3 p-4">
             <div className="flex items-center gap-3">
@@ -473,16 +472,16 @@ export default function ScanPage() {
                   <h2 className="font-display font-semibold">Bluetooth</h2>
                   {modules.bluetooth.running && <ActiveBadge color="indigo" />}
                   {btRounds > 0 && !modules.bluetooth.running && (
-                    mf('bluetooth').some(f => f.severity !== 'info')
-                      ? <SuspiciousBadge count={mf('bluetooth').filter(f => f.severity !== 'info').length} />
+                    mf('bluetooth').some((f) => f.severity !== 'info')
+                      ? <SuspiciousBadge count={mf('bluetooth').filter((f) => f.severity !== 'info').length} />
                       : <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] text-green-400">
-                          {btRounds} escaneado{btRounds !== 1 ? 's' : ''} · sin coincidencias
+                          {btRounds} escaneado{btRounds !== 1 ? 's' : ''} · sin coincidencias sobre umbral
                         </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {availability.bluetooth.supported
-                    ? 'Analiza dispositivos Bluetooth cercanos buscando firmware de cámaras'
+                    ? 'Analiza dispositivos Bluetooth cercanos buscando indicadores compatibles con cámaras'
                     : 'Requiere Chrome en Android (Web Bluetooth API)'}
                 </p>
               </div>
@@ -506,7 +505,7 @@ export default function ScanPage() {
           )}
           {btRounds > 0 && !modules.bluetooth.running && (
             <p className="px-4 pb-3 text-xs text-muted-foreground">
-              {btRounds} dispositivo{btRounds !== 1 ? 's' : ''} analizados. Pulsa "Otro dispositivo" para continuar.
+              {btRounds} dispositivo{btRounds !== 1 ? 's' : ''} analizados. Pulsa “Otro dispositivo” para continuar.
             </p>
           )}
           {mf('bluetooth').length > 0 && (
@@ -521,13 +520,11 @@ export default function ScanPage() {
           <AlertTitle>{t('disclaimerTitle')}</AlertTitle>
           <AlertDescription>{t('disclaimerBody')}</AlertDescription>
         </Alert>
-
       </main>
     </div>
   );
 }
 
-// ── Small reusable badges ────────────────────────────────────────────────────
 function ActiveBadge({ color = 'cyan' }: { color?: string }) {
   const cls: Record<string, string> = {
     cyan: 'bg-cyan-500/10 text-cyan-400', violet: 'bg-violet-500/10 text-violet-400',
@@ -540,13 +537,15 @@ function ActiveBadge({ color = 'cyan' }: { color?: string }) {
     </span>
   );
 }
+
 function ClearBadge() {
   return (
     <span className="flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-medium text-green-400">
-      <CheckCircle2 className="size-3" aria-hidden /> Sin anomalías
+      <CheckCircle2 className="size-3" aria-hidden /> Sin señal sobre umbral
     </span>
   );
 }
+
 function SuspiciousBadge({ count }: { count: number }) {
   return (
     <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400">
@@ -554,6 +553,7 @@ function SuspiciousBadge({ count }: { count: number }) {
     </span>
   );
 }
+
 function UnavailablePill() {
   return <span className="shrink-0 rounded-lg border border-border/30 px-3 py-1.5 text-xs text-muted-foreground/40">No disponible</span>;
 }
