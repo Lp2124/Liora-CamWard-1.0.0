@@ -30,6 +30,13 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class RateLimitError extends AppError {
+  constructor(message: string = 'Too many requests') {
+    super(message, 429, 'RATE_LIMITED')
+    this.name = 'RateLimitError'
+  }
+}
+
 export class PayloadTooLargeError extends AppError {
   constructor(message: string = 'Payload too large') {
     super(message, 413, 'PAYLOAD_TOO_LARGE')
