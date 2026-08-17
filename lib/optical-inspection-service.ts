@@ -84,7 +84,7 @@ export async function analyzeOpticalObservationV2(
       module: 'optical',
       severity: finding.severity,
       title: finding.title,
-      detail: finding.detail,
+      detail: finding.detail ?? classification.explanation,
       evidence: {
         observationId,
         captureNonce: request.captureNonce,
