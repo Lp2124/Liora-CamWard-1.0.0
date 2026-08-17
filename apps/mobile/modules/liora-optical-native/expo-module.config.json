@@ -1,0 +1,9 @@
+{
+  "platforms": ["android", "apple"],
+  "apple": {
+    "modules": ["LioraOpticalNativeModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.lioraopticalnative.LioraOpticalNativeModule"]
+  }
+}
