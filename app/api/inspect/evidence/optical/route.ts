@@ -7,6 +7,7 @@ import { getCurrentUser } from '@/lib/session';
 import { handleApiError } from '@/lib/api-error-response';
 import {
   PayloadTooLargeError,
+  RateLimitError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/errors';
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
       }),
       RATE_LIMIT_CONFIGS.observation,
     );
-    if (!rateLimit.allowed) throw new ValidationError('Límite de carga de evidencia excedido.');
+    if (!rateLimit.allowed) throw new RateLimitError('Límite de carga de evidencia excedido.');
 
     const contentType = (request.headers.get('content-type') ?? '').split(';', 1)[0]?.trim().toLowerCase();
     if (contentType !== 'image/jpeg') throw new ValidationError('Se requiere Content-Type image/jpeg.');
