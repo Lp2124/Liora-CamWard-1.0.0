@@ -36,9 +36,12 @@ export interface SubmitOpticalObservationRequest {
   captureMode: 'normal' | 'torch_off' | 'torch_on';
   brightnessEstimate: number;
   torchActive: boolean;
-  orientation: { alpha: number; beta: number; gamma: number };
+  orientation?: { alpha: number; beta: number; gamma: number };
   clusterData: OpticalClusterData[];
   frameCount: number;
+  quality?: OpticalQualityMetrics;
+  pairedCapture?: OpticalPairedCaptureMetrics;
+  frameEvidence?: OpticalFrameEvidenceReference[];
   deviceFingerprint: string;
 }
 
@@ -50,6 +53,38 @@ export interface OpticalClusterData {
   compactness: number;
   maxBrightness: number;
   saturation: number;
+}
+
+export interface OpticalQualityMetrics {
+  overexposedRatio: number;
+  sharpnessVariance: number;
+}
+
+export interface OpticalPairedCaptureMetrics {
+  torchOffFrameCount: number;
+  torchOnFrameCount: number;
+  torchOffBrightnessEstimate: number;
+  torchOnBrightnessEstimate: number;
+  differentialDelta: number | null;
+  matchedClusterCount: number;
+}
+
+export interface OpticalFrameEvidenceReference {
+  phase: 'torch_off' | 'torch_on';
+  sha256: string;
+  sizeBytes: number;
+  evidenceId?: string;
+}
+
+export interface UploadOpticalEvidenceResponse {
+  evidenceId: string;
+  inspectionId: string;
+  captureNonce: string;
+  phase: 'torch_off' | 'torch_on';
+  sha256: string;
+  sizeBytes: number;
+  mimeType: 'image/jpeg';
+  storedAt: string;
 }
 
 export interface SubmitMagneticObservationRequest {
