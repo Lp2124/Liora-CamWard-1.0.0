@@ -115,7 +115,7 @@ run 'SECURITY TESTS' pnpm test:security
 run 'ROOT BUILD' pnpm build
 
 printf '\n===== RULE 8: MOBILE PACKAGE CHECK =====\n'
-run 'MOBILE OPTICAL TESTS' pnpm --filter @liora/mobile test -- --runInBand
+run 'MOBILE OPTICAL TESTS' pnpm --filter @liora/mobile test
 run 'EXPO SDK DEPENDENCY CHECK' pnpm --filter @liora/mobile exec expo install --check
 
 printf '\n========================================\n'
