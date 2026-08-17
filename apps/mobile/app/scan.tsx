@@ -1,9 +1,7 @@
 /**
- * Liora CamWard — mobile scan screen.
+ * Liora CamWard — production mobile inspection screen.
  *
- * This screen coordinates real native sensors. It does not fabricate optical
- * findings: camera preview is active, while optical classification remains
- * disabled until a real pixel-analysis pipeline is wired.
+ * Only modules with real device acquisition and server submission are exposed.
  */
 import { useCallback, useEffect, useRef } from 'react';
 import {
@@ -14,7 +12,6 @@ import {
   ScrollView,
   Vibration,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { randomUUID } from 'expo-crypto';
 import { useScanStore } from '../src/store/scan-store';
@@ -34,8 +31,6 @@ import type { RiskLevel } from '@liora/contracts';
 const DEVICE_FINGERPRINT = randomUUID();
 
 export default function ScanScreen() {
-  const cameraRef = useRef<CameraView>(null);
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const magneticHandleRef = useRef<MagneticScanHandle | null>(null);
   const magneticIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestMagneticProgressRef = useRef<MagneticNativeProgress | null>(null);
@@ -65,12 +60,16 @@ export default function ScanScreen() {
     }
   }, []);
 
-  const stopNativeResources = useCallback(() => {
+  const stopMagnetic = useCallback(() => {
     clearMagneticInterval();
     magneticHandleRef.current?.stop();
     magneticHandleRef.current = null;
     latestMagneticProgressRef.current = null;
   }, [clearMagneticInterval]);
+
+  const stopNativeResources = useCallback(() => {
+    stopMagnetic();
+  }, [stopMagnetic]);
 
   useEffect(() => {
     return () => {
@@ -94,7 +93,7 @@ export default function ScanScreen() {
       activeInspectionId = inspection.inspectionId;
       setInspectionId(activeInspectionId);
     } catch {
-      setError('No se pudo crear la inspección. Verifica tu conexión.');
+      setError('No se pudo crear la inspección. Verifica la conexión y autenticación.');
       setPhase('error');
       return;
     }
@@ -108,11 +107,24 @@ export default function ScanScreen() {
       .then((handle) => {
         magneticHandleRef.current = handle;
 
+        const initialProgress = latestMagneticProgressRef.current;
+        if (initialProgress?.phase === 'unavailable' || initialProgress?.phase === 'error') {
+          stopMagnetic();
+          markModuleComplete('magnetic');
+          return;
+        }
+
         magneticIntervalRef.current = setInterval(async () => {
           const progress = latestMagneticProgressRef.current;
-          if (!progress || progress.phase !== 'monitoring' || magneticSubmittedRef.current) {
+          if (!progress || magneticSubmittedRef.current) return;
+
+          if (progress.phase === 'unavailable' || progress.phase === 'error') {
+            stopMagnetic();
+            markModuleComplete('magnetic');
             return;
           }
+
+          if (progress.phase !== 'monitoring') return;
 
           const samples = handle.getSamples();
           if (samples.length === 0) return;
@@ -127,25 +139,28 @@ export default function ScanScreen() {
               clientTimestamp: new Date().toISOString(),
               phase: 'monitoring',
               samples,
-              orientation: { alpha: 0, beta: 0, gamma: 0 },
+              baselineMicroTesla: progress.baselineMicroTesla ?? undefined,
               deviceFingerprint: DEVICE_FINGERPRINT,
             });
             addFindings(result.findings, result.riskContribution);
           } catch {
-            setError('No se pudo enviar la lectura magnética; los demás módulos continúan.');
+            setError('La lectura magnética fue capturada, pero el servidor no aceptó la observación.');
           } finally {
+            handle.stop();
+            magneticHandleRef.current = null;
             markModuleComplete('magnetic');
           }
         }, 500);
       })
       .catch(() => {
+        stopMagnetic();
         markModuleComplete('magnetic');
       });
 
-    let bleSeenCount = 0;
+    let bleObservationCount = 0;
     scanBleWindow(12000, () => {
-      bleSeenCount += 1;
-      setBleDevicesFound(bleSeenCount);
+      bleObservationCount += 1;
+      setBleDevicesFound(bleObservationCount);
     })
       .then(async (result) => {
         if (result.devices.length > 0) {
@@ -159,12 +174,13 @@ export default function ScanScreen() {
             });
             addFindings(analysis.findings, analysis.riskContribution);
           } catch {
-            setError('No se pudo enviar el escaneo Bluetooth; la captura local sí se realizó.');
+            setError('El escaneo BLE terminó, pero el servidor no aceptó la observación.');
           }
         }
         markModuleComplete('ble');
       })
       .catch(() => {
+        setError('No se pudo ejecutar el escaneo BLE en este dispositivo.');
         markModuleComplete('ble');
       });
   }, [
@@ -177,6 +193,7 @@ export default function ScanScreen() {
     setInspectionId,
     setMagneticProgress,
     setPhase,
+    stopMagnetic,
     stopNativeResources,
   ]);
 
@@ -193,41 +210,8 @@ export default function ScanScreen() {
 
   const riskColor = getRiskColor(riskResult?.level ?? 'none');
 
-  if (!cameraPermission) return <View style={styles.container} />;
-
-  if (!cameraPermission.granted) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.center}>
-          <Text style={styles.permText}>Se requiere acceso a la cámara</Text>
-          <Text style={styles.permSubtext}>
-            Liora CamWard usa la cámara para inspección óptica. No declara hallazgos ópticos
-            hasta que el análisis real de imagen haya sido ejecutado.
-          </Text>
-          <TouchableOpacity style={styles.permButton} onPress={requestCameraPermission}>
-            <Text style={styles.permButtonText}>Conceder permiso</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.cameraContainer}>
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing="back"
-          enableTorch={phase === 'scanning'}
-        />
-        {phase === 'scanning' && (
-          <View style={styles.cameraOverlay}>
-            <Text style={styles.cameraHint}>Mueve lentamente por la habitación</Text>
-          </View>
-        )}
-      </View>
-
       <View style={[styles.riskBanner, { borderColor: riskColor }]}>
         <Text style={[styles.riskLabel, { color: riskColor }]}>
           {riskResult ? getRiskLabel(riskResult.level) : 'Sin clasificación todavía'}
@@ -236,27 +220,35 @@ export default function ScanScreen() {
       </View>
 
       <ScrollView style={styles.modules} contentContainerStyle={styles.modulesContent}>
+        <Text style={styles.scopeText}>
+          Esta inspección ejecuta únicamente los módulos activos y verificables del dispositivo.
+        </Text>
+
         <ModuleStatus
-          label="Magnetómetro"
+          label="Análisis magnético"
           status={
             magneticProgress?.phase === 'calibrating'
-              ? `Calibrando... ${magneticProgress.secondsRemainingCalibration}s`
+              ? `Calibrando sensor: ${magneticProgress.secondsRemainingCalibration}s`
               : magneticProgress?.phase === 'monitoring'
                 ? `${magneticProgress.currentMicroTesla} µT (Δ${magneticProgress.signedDelta ?? 0} µT)`
                 : magneticProgress?.phase === 'unavailable'
                   ? 'Sensor no disponible'
                   : magneticProgress?.phase === 'error'
-                    ? 'Lectura inválida/saturada'
-                    : 'Esperando...'
+                    ? 'Lectura inválida o saturada'
+                    : phase === 'scanning'
+                      ? 'Iniciando sensor...'
+                      : 'Inactivo'
           }
         />
         <ModuleStatus
-          label="Bluetooth"
-          status={bleDevicesFound > 0 ? `${bleDevicesFound} observaciones BLE` : phase === 'scanning' ? 'Escaneando...' : 'Inactivo'}
-        />
-        <ModuleStatus
-          label="Óptico"
-          status={phase === 'scanning' ? 'Cámara activa; clasificación óptica no habilitada' : 'Inactivo'}
+          label="Exploración Bluetooth"
+          status={
+            bleDevicesFound > 0
+              ? `${bleDevicesFound} observaciones BLE recibidas`
+              : phase === 'scanning'
+                ? 'Escaneando dispositivos...'
+                : 'Inactivo'
+          }
         />
 
         {error && (
@@ -287,13 +279,23 @@ export default function ScanScreen() {
 
       <View style={styles.controls}>
         {phase === 'idle' || phase === 'completed' || phase === 'error' ? (
-          <TouchableOpacity style={styles.scanButton} onPress={startScan}>
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={startScan}
+            accessibilityRole="button"
+            accessibilityLabel="Iniciar inspección"
+          >
             <Text style={styles.scanButtonText}>
               {phase === 'idle' ? 'Iniciar inspección' : 'Nueva inspección'}
             </Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.stopButton} onPress={stopScan}>
+          <TouchableOpacity
+            style={styles.stopButton}
+            onPress={stopScan}
+            accessibilityRole="button"
+            accessibilityLabel="Detener inspección"
+          >
             <Text style={styles.stopButtonText}>Detener inspección</Text>
           </TouchableOpacity>
         )}
@@ -326,11 +328,11 @@ function getRiskColor(level: RiskLevel): string {
 function getRiskLabel(level: RiskLevel): string {
   const labels: Record<RiskLevel, string> = {
     none: 'Sin evidencia concluyente',
-    informational: 'Informativo',
-    low: 'Riesgo bajo',
-    medium: 'Riesgo moderado',
-    high: 'Riesgo alto',
-    critical: 'Riesgo crítico',
+    informational: 'Evidencia informativa',
+    low: 'Indicadores de riesgo bajo',
+    medium: 'Indicadores de riesgo moderado',
+    high: 'Indicadores de riesgo alto',
+    critical: 'Indicadores críticos',
   };
   return labels[level];
 }
@@ -343,32 +345,27 @@ function getSeverityStyle(severity: string): object {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0a0a' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  cameraContainer: { height: 220, backgroundColor: '#111' },
-  camera: { flex: 1 },
-  cameraOverlay: { position: 'absolute', bottom: 8, left: 0, right: 0, alignItems: 'center' },
-  cameraHint: { color: '#00ff88', fontSize: 12, opacity: 0.8 },
   riskBanner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
-    paddingHorizontal: 16,
+    padding: 16,
     borderBottomWidth: 1,
   },
-  riskLabel: { fontSize: 14, fontWeight: '700' },
-  riskScore: { fontSize: 12, color: '#666' },
+  riskLabel: { fontSize: 14, fontWeight: '700', flex: 1 },
+  riskScore: { fontSize: 12, color: '#777', marginLeft: 12 },
   modules: { flex: 1 },
   modulesContent: { padding: 16 },
+  scopeText: { fontSize: 12, color: '#777', lineHeight: 18, marginBottom: 16 },
   moduleStatus: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
   },
-  moduleLabel: { fontSize: 13, color: '#666' },
-  moduleValue: { fontSize: 13, color: '#aaa', maxWidth: '70%', textAlign: 'right' },
+  moduleLabel: { fontSize: 13, color: '#888', flex: 1 },
+  moduleValue: { fontSize: 13, color: '#bbb', maxWidth: '62%', textAlign: 'right' },
   errorBox: {
     backgroundColor: '#1a0000',
     borderRadius: 8,
@@ -377,8 +374,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#ff0044',
   },
-  errorText: { color: '#ff4444', fontSize: 12 },
-  findings: { marginTop: 16 },
+  errorText: { color: '#ff6666', fontSize: 12, lineHeight: 18 },
+  findings: { marginTop: 20 },
   findingsTitle: { fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 12 },
   finding: {
     backgroundColor: '#111',
@@ -388,7 +385,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
   },
   findingTitle: { fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 4 },
-  findingDetail: { fontSize: 11, color: '#888', lineHeight: 16 },
+  findingDetail: { fontSize: 11, color: '#999', lineHeight: 16 },
   recommendationBox: {
     backgroundColor: '#0a1a0a',
     borderRadius: 8,
@@ -415,9 +412,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ff0044',
   },
-  stopButtonText: { fontSize: 16, fontWeight: '700', color: '#ff4444' },
-  permText: { fontSize: 18, fontWeight: '700', color: '#fff', textAlign: 'center', marginBottom: 12 },
-  permSubtext: { fontSize: 13, color: '#666', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  permButton: { backgroundColor: '#00ff88', borderRadius: 10, padding: 16, alignItems: 'center' },
-  permButtonText: { fontSize: 14, fontWeight: '700', color: '#0a0a0a' },
+  stopButtonText: { fontSize: 16, fontWeight: '700', color: '#ff6666' },
 });
