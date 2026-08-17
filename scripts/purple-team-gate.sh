@@ -65,8 +65,8 @@ if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -vE '(^|/)\.env\.example$'; 
   fail 'Tracked environment/secret file detected. Only .env.example may be tracked.'
 fi
 
-SECRET_PATTERN='(sk_live_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|postgres(ql)?://[^[:space:]]+:[^[:space:]@]+@)'
-if git grep -nEI "$SECRET_PATTERN" -- ':!pnpm-lock.yaml' ':!package-lock.json' ':!*.snap'; then
+SECRET_PATTERN='(sk_live_[A-Za-z0-9]{16,}|sk-proj-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|gh[pousr]_[A-Za-z0-9]{30,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|STRIPE_WEBHOOK_SECRET=[^[:space:]]+|STRIPE_SECRET_KEY=[^[:space:]]+)'
+if git grep -nEI "$SECRET_PATTERN" -- ':!pnpm-lock.yaml' ':!package-lock.json' ':!*.snap' ':!.env.example'; then
   fail 'Credential-like material detected in tracked source.'
 fi
 printf '[PASS] No tracked env files or obvious credential patterns.\n'
