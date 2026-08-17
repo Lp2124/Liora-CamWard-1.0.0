@@ -22,6 +22,14 @@ export interface NativeOpticalAnalysis {
   clusters: NativeOpticalCluster[];
 }
 
+export interface NativeOpticalEvidenceCrop {
+  uri: string;
+  width: number;
+  height: number;
+  sha256: string;
+  sizeBytes: number;
+}
+
 interface LioraOpticalNativeModuleApi {
   analyzeImage(
     uri: string,
@@ -32,6 +40,13 @@ interface LioraOpticalNativeModuleApi {
     maxDimension: number,
     edgeMarginPixels: number,
   ): Promise<NativeOpticalAnalysis>;
+
+  cropEvidence(
+    uri: string,
+    centerXPercent: number,
+    centerYPercent: number,
+    regionPercent: number,
+  ): Promise<NativeOpticalEvidenceCrop>;
 }
 
 export default requireNativeModule<LioraOpticalNativeModuleApi>('LioraOpticalNative');
