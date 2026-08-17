@@ -1,7 +1,8 @@
 /**
  * Liora CamWard — production mobile inspection screen.
  *
- * Only modules with real device acquisition and server submission are exposed.
+ * Only modules with real device acquisition are exposed. Sensor acquisition
+ * never depends on backend availability; server synchronization is optional.
  */
 import { useCallback, useEffect, useRef } from 'react';
 import {
@@ -84,7 +85,7 @@ export default function ScanScreen() {
     setPhase('requesting_permissions');
     magneticSubmittedRef.current = false;
 
-    let activeInspectionId: string;
+    let activeInspectionId: string | null = null;
 
     try {
       const inspection = await createInspection({
@@ -93,9 +94,7 @@ export default function ScanScreen() {
       activeInspectionId = inspection.inspectionId;
       setInspectionId(activeInspectionId);
     } catch {
-      setError('No se pudo crear la inspección. Verifica la conexión y autenticación.');
-      setPhase('error');
-      return;
+      setError('Inspección local activa. La sincronización segura con servidor no está disponible en esta sesión.');
     }
 
     setPhase('scanning');
@@ -133,18 +132,20 @@ export default function ScanScreen() {
           clearMagneticInterval();
 
           try {
-            const result = await submitMagneticObservation({
-              inspectionId: activeInspectionId,
-              captureNonce: randomUUID(),
-              clientTimestamp: new Date().toISOString(),
-              phase: 'monitoring',
-              samples,
-              baselineMicroTesla: progress.baselineMicroTesla ?? undefined,
-              deviceFingerprint: DEVICE_FINGERPRINT,
-            });
-            addFindings(result.findings, result.riskContribution);
+            if (activeInspectionId) {
+              const result = await submitMagneticObservation({
+                inspectionId: activeInspectionId,
+                captureNonce: randomUUID(),
+                clientTimestamp: new Date().toISOString(),
+                phase: 'monitoring',
+                samples,
+                baselineMicroTesla: progress.baselineMicroTesla ?? undefined,
+                deviceFingerprint: DEVICE_FINGERPRINT,
+              });
+              addFindings(result.findings, result.riskContribution);
+            }
           } catch {
-            setError('La lectura magnética fue capturada, pero el servidor no aceptó la observación.');
+            setError('Lectura magnética local completada; la sincronización con servidor falló.');
           } finally {
             handle.stop();
             magneticHandleRef.current = null;
@@ -163,8 +164,8 @@ export default function ScanScreen() {
       setBleDevicesFound(bleObservationCount);
     })
       .then(async (result) => {
-        if (result.devices.length > 0) {
-          try {
+        try {
+          if (activeInspectionId && result.devices.length > 0) {
             const analysis = await submitBleObservation({
               inspectionId: activeInspectionId,
               captureNonce: randomUUID(),
@@ -173,14 +174,15 @@ export default function ScanScreen() {
               deviceFingerprint: DEVICE_FINGERPRINT,
             });
             addFindings(analysis.findings, analysis.riskContribution);
-          } catch {
-            setError('El escaneo BLE terminó, pero el servidor no aceptó la observación.');
           }
+        } catch {
+          setError('Exploración BLE local completada; la sincronización con servidor falló.');
+        } finally {
+          markModuleComplete('ble');
         }
-        markModuleComplete('ble');
       })
       .catch(() => {
-        setError('No se pudo ejecutar el escaneo BLE en este dispositivo.');
+        setError('No se pudo ejecutar la exploración BLE en este dispositivo.');
         markModuleComplete('ble');
       });
   }, [
@@ -214,14 +216,15 @@ export default function ScanScreen() {
     <SafeAreaView style={styles.container}>
       <View style={[styles.riskBanner, { borderColor: riskColor }]}>
         <Text style={[styles.riskLabel, { color: riskColor }]}>
-          {riskResult ? getRiskLabel(riskResult.level) : 'Sin clasificación todavía'}
+          {riskResult ? getRiskLabel(riskResult.level) : 'Sin clasificación de servidor'}
         </Text>
         {riskResult && <Text style={styles.riskScore}>Score: {riskResult.score}/100</Text>}
       </View>
 
       <ScrollView style={styles.modules} contentContainerStyle={styles.modulesContent}>
         <Text style={styles.scopeText}>
-          Esta inspección ejecuta únicamente los módulos activos y verificables del dispositivo.
+          Esta inspección ejecuta únicamente sensores reales disponibles en el dispositivo.
+          La ausencia de hallazgos no descarta dispositivos ocultos.
         </Text>
 
         <ModuleStatus
@@ -259,7 +262,7 @@ export default function ScanScreen() {
 
         {findings.length > 0 && (
           <View style={styles.findings}>
-            <Text style={styles.findingsTitle}>Hallazgos ({findings.length})</Text>
+            <Text style={styles.findingsTitle}>Hallazgos del servidor ({findings.length})</Text>
             {findings.map((finding, index) => (
               <View key={finding.id ?? index} style={[styles.finding, getSeverityStyle(finding.severity)]}>
                 <Text style={styles.findingTitle}>{finding.title}</Text>
