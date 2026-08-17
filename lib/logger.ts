@@ -1,24 +1,24 @@
 type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
 class Logger {
-  private format(level: LogLevel, message: string) {
+  private format(level: LogLevel, message: string): string {
     const timestamp = new Date().toISOString()
     return `[${timestamp}] [${level.toUpperCase()}] ${message}`
   }
 
-  info(message: string, ...args: any[]) {
+  info(message: string, ...args: unknown[]): void {
     console.log(this.format('info', message), ...args)
   }
 
-  warn(message: string, ...args: any[]) {
+  warn(message: string, ...args: unknown[]): void {
     console.warn(this.format('warn', message), ...args)
   }
 
-  error(message: string, ...args: any[]) {
+  error(message: string, ...args: unknown[]): void {
     console.error(this.format('error', message), ...args)
   }
 
-  debug(message: string, ...args: any[]) {
+  debug(message: string, ...args: unknown[]): void {
     if (process.env.NODE_ENV === 'development') {
       console.debug(this.format('debug', message), ...args)
     }
