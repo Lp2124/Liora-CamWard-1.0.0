@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { analyzeOpticalObservationV2 } from '@/lib/optical-inspection-service';
 import { handleApiError } from '@/lib/api-error-response';
-import { UnauthorizedError, ValidationError } from '@/lib/errors';
+import { RateLimitError, UnauthorizedError, ValidationError } from '@/lib/errors';
 import { readBodyJson } from '@/lib/body-parser';
 import {
   buildRateLimitKey,
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       }),
       RATE_LIMIT_CONFIGS.observation,
     );
-    if (!limit.allowed) throw new ValidationError('Límite de observaciones ópticas excedido.');
+    if (!limit.allowed) throw new RateLimitError('Límite de observaciones ópticas excedido.');
 
     const result = await analyzeOpticalObservationV2(
       user,
@@ -82,10 +82,10 @@ function validateOpticalRequest(body: Record<string, unknown>): void {
 
 function validateCluster(value: unknown): void {
   if (!isRecord(value)) throw new ValidationError('Cluster óptico inválido.');
-  boundedNumber(value.persistedFrames, 0, 60, 'persistedFrames');
+  integerInRange(value.persistedFrames, 0, 60, 'persistedFrames');
   boundedNumber(value.relativeX, 0, 100, 'relativeX');
   boundedNumber(value.relativeY, 0, 100, 'relativeY');
-  boundedNumber(value.clusterSizePx, 1, 100000, 'clusterSizePx');
+  integerInRange(value.clusterSizePx, 1, 100000, 'clusterSizePx');
   boundedNumber(value.compactness, 0, 1, 'compactness');
   boundedNumber(value.maxBrightness, 0, 255, 'maxBrightness');
   boundedNumber(value.saturation, 0, 1, 'saturation');
@@ -99,11 +99,11 @@ function validateQuality(value: unknown): void {
 
 function validatePair(value: unknown): void {
   if (!isRecord(value)) throw new ValidationError('pairedCapture inválido.');
-  boundedNumber(value.torchOffFrameCount, 1, 60, 'torchOffFrameCount');
-  boundedNumber(value.torchOnFrameCount, 1, 60, 'torchOnFrameCount');
+  integerInRange(value.torchOffFrameCount, 1, 60, 'torchOffFrameCount');
+  integerInRange(value.torchOnFrameCount, 1, 60, 'torchOnFrameCount');
   boundedNumber(value.torchOffBrightnessEstimate, 0, 255, 'torchOffBrightnessEstimate');
   boundedNumber(value.torchOnBrightnessEstimate, 0, 255, 'torchOnBrightnessEstimate');
-  boundedNumber(value.matchedClusterCount, 0, 500, 'matchedClusterCount');
+  integerInRange(value.matchedClusterCount, 0, 500, 'matchedClusterCount');
   if (value.differentialDelta !== null && value.differentialDelta !== undefined) {
     boundedNumber(value.differentialDelta, -255, 255, 'differentialDelta');
   }
@@ -119,7 +119,7 @@ function validateEvidenceReferences(value: unknown): void {
     if (typeof reference.sha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(reference.sha256)) {
       throw new ValidationError('SHA-256 de evidencia inválido.');
     }
-    boundedNumber(reference.sizeBytes, 1, 5 * 1024 * 1024, 'sizeBytes');
+    integerInRange(reference.sizeBytes, 1, 5 * 1024 * 1024, 'sizeBytes');
     if (reference.evidenceId !== undefined && (typeof reference.evidenceId !== 'string' || reference.evidenceId.length > 80)) {
       throw new ValidationError('evidenceId inválido.');
     }
@@ -128,6 +128,12 @@ function validateEvidenceReferences(value: unknown): void {
 
 function boundedNumber(value: unknown, min: number, max: number, field: string): void {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
+    throw new ValidationError(`${field} inválido.`);
+  }
+}
+
+function integerInRange(value: unknown, min: number, max: number, field: string): void {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
     throw new ValidationError(`${field} inválido.`);
   }
 }
