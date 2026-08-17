@@ -93,7 +93,24 @@ test('optical classifier cannot elevate a lens-like cluster without verified sec
   assert.deepEqual(result.boundingBoxes, []);
 });
 
-test('optical classifier elevates only when persistent lens-like signal has second capture and differential response', () => {
+test('optical classifier does not treat a darker torch-on response as corroboration', () => {
+  const result = classifyOpticalObservation({
+    clusters: [lensCluster],
+    captureMode: 'torch_on',
+    brightnessEstimate: 130,
+    torchActive: true,
+    frameCount: 8,
+    hasSecondCapture: true,
+    differentialDelta: -50,
+    overexposedRatio: 0.01,
+    sharpnessVariance: 90,
+  });
+
+  assert.equal(result.category, 'lens');
+  assert.equal(result.verdict, 'review_required');
+});
+
+test('optical classifier elevates only when persistent lens-like signal has second capture and positive torch response', () => {
   const result = classifyOpticalObservation({
     clusters: [lensCluster],
     captureMode: 'torch_on',
@@ -108,6 +125,6 @@ test('optical classifier elevates only when persistent lens-like signal has seco
 
   assert.equal(result.category, 'lens');
   assert.equal(result.verdict, 'suspected_device');
-  assert.match(result.explanation, /diferencia de brillo OFF\/ON/u);
+  assert.match(result.explanation, /aumento de brillo OFF→ON/u);
   assert.doesNotMatch(result.explanation, /confirmad[oa]/iu);
 });
