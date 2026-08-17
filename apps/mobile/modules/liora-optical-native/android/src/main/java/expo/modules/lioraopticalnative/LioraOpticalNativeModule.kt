@@ -6,7 +6,9 @@ import android.net.Uri
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
+import java.io.FileOutputStream
 import java.security.MessageDigest
+import java.util.UUID
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
@@ -34,6 +36,19 @@ class LioraOpticalNativeModule : Module() {
         edgeMarginPixels = max(0, edgeMarginPixels),
       )
     }
+
+    AsyncFunction("cropEvidence") {
+      uri: String,
+      centerXPercent: Double,
+      centerYPercent: Double,
+      regionPercent: Double ->
+      cropEvidence(
+        uri,
+        centerXPercent.coerceIn(0.0, 100.0),
+        centerYPercent.coerceIn(0.0, 100.0),
+        regionPercent.coerceIn(5.0, 60.0),
+      )
+    }
   }
 
   private fun analyzeImage(
@@ -47,13 +62,9 @@ class LioraOpticalNativeModule : Module() {
   ): Map<String, Any> {
     val file = resolveLocalFile(uri)
     require(file.isFile) { "OPTICAL_FILE_NOT_FOUND" }
-
     val fileBytes = file.readBytes()
     require(fileBytes.isNotEmpty()) { "OPTICAL_FILE_EMPTY" }
-
-    val sha256 = MessageDigest.getInstance("SHA-256")
-      .digest(fileBytes)
-      .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    val sha256 = sha256(fileBytes)
 
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.size, bounds)
@@ -66,7 +77,6 @@ class LioraOpticalNativeModule : Module() {
     }
     val decoded = BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.size, decodeOptions)
       ?: error("OPTICAL_IMAGE_DECODE_FAILED")
-
     val analyzed = scaleDownIfNeeded(decoded, maxDimension)
     if (analyzed !== decoded) decoded.recycle()
 
@@ -74,10 +84,8 @@ class LioraOpticalNativeModule : Module() {
       val width = analyzed.width
       val height = analyzed.height
       require(width > 2 && height > 2) { "OPTICAL_IMAGE_TOO_SMALL" }
-
       val pixels = IntArray(width * height)
       analyzed.getPixels(pixels, 0, width, 0, 0, width, height)
-
       val luminance = DoubleArray(pixels.size)
       val saturation = DoubleArray(pixels.size)
       val candidates = BooleanArray(pixels.size)
@@ -93,7 +101,6 @@ class LioraOpticalNativeModule : Module() {
         val maxChannel = max(r, max(g, b)).toDouble()
         val minChannel = min(r, min(g, b)).toDouble()
         val sat = if (maxChannel <= 0.0) 0.0 else (maxChannel - minChannel) / maxChannel
-
         luminance[index] = luma
         saturation[index] = sat
         brightnessSum += luma
@@ -108,16 +115,6 @@ class LioraOpticalNativeModule : Module() {
         }
       }
 
-      val clusters = extractClusters(
-        candidates = candidates,
-        luminance = luminance,
-        saturation = saturation,
-        width = width,
-        height = height,
-        minClusterPixels = minClusterPixels,
-        maxClusterPixels = maxClusterPixels,
-      )
-
       return mapOf(
         "sourceWidth" to bounds.outWidth,
         "sourceHeight" to bounds.outHeight,
@@ -128,10 +125,63 @@ class LioraOpticalNativeModule : Module() {
         "sharpnessVariance" to computeLaplacianVariance(luminance, width, height),
         "sha256" to sha256,
         "sizeBytes" to fileBytes.size,
-        "clusters" to clusters,
+        "clusters" to extractClusters(
+          candidates,
+          luminance,
+          saturation,
+          width,
+          height,
+          minClusterPixels,
+          maxClusterPixels,
+        ),
       )
     } finally {
       analyzed.recycle()
+    }
+  }
+
+  private fun cropEvidence(
+    uri: String,
+    centerXPercent: Double,
+    centerYPercent: Double,
+    regionPercent: Double,
+  ): Map<String, Any> {
+    val sourceFile = resolveLocalFile(uri)
+    require(sourceFile.isFile) { "OPTICAL_FILE_NOT_FOUND" }
+    val bitmap = BitmapFactory.decodeFile(sourceFile.absolutePath)
+      ?: error("OPTICAL_IMAGE_DECODE_FAILED")
+
+    try {
+      val regionPixels = max(32, (min(bitmap.width, bitmap.height) * regionPercent / 100.0).toInt())
+      val cropWidth = min(regionPixels, bitmap.width)
+      val cropHeight = min(regionPixels, bitmap.height)
+      val centerX = (bitmap.width * centerXPercent / 100.0).toInt()
+      val centerY = (bitmap.height * centerYPercent / 100.0).toInt()
+      val left = (centerX - cropWidth / 2).coerceIn(0, bitmap.width - cropWidth)
+      val top = (centerY - cropHeight / 2).coerceIn(0, bitmap.height - cropHeight)
+      val cropped = Bitmap.createBitmap(bitmap, left, top, cropWidth, cropHeight)
+
+      try {
+        val context = appContext.reactContext ?: error("OPTICAL_APP_CONTEXT_UNAVAILABLE")
+        val output = File(context.cacheDir, "liora-optical-${UUID.randomUUID()}.jpg")
+        FileOutputStream(output).use { stream ->
+          require(cropped.compress(Bitmap.CompressFormat.JPEG, 92, stream)) {
+            "OPTICAL_EVIDENCE_ENCODE_FAILED"
+          }
+        }
+        val bytes = output.readBytes()
+        return mapOf(
+          "uri" to Uri.fromFile(output).toString(),
+          "width" to cropWidth,
+          "height" to cropHeight,
+          "sha256" to sha256(bytes),
+          "sizeBytes" to bytes.size,
+        )
+      } finally {
+        cropped.recycle()
+      }
+    } finally {
+      bitmap.recycle()
     }
   }
 
@@ -142,6 +192,10 @@ class LioraOpticalNativeModule : Module() {
     require(!path.isNullOrBlank()) { "OPTICAL_URI_INVALID" }
     return File(path)
   }
+
+  private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+    .digest(bytes)
+    .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
   private fun computeSampleSize(width: Int, height: Int, maxDimension: Int): Int {
     var sample = 1
@@ -159,9 +213,12 @@ class LioraOpticalNativeModule : Module() {
     val largest = max(bitmap.width, bitmap.height)
     if (largest <= maxDimension) return bitmap
     val scale = maxDimension.toDouble() / largest
-    val width = max(1, (bitmap.width * scale).toInt())
-    val height = max(1, (bitmap.height * scale).toInt())
-    return Bitmap.createScaledBitmap(bitmap, width, height, true)
+    return Bitmap.createScaledBitmap(
+      bitmap,
+      max(1, (bitmap.width * scale).toInt()),
+      max(1, (bitmap.height * scale).toInt()),
+      true,
+    )
   }
 
   private fun extractClusters(
@@ -179,12 +236,10 @@ class LioraOpticalNativeModule : Module() {
 
     for (start in candidates.indices) {
       if (!candidates[start] || visited[start]) continue
-
       var head = 0
       var tail = 0
       queue[tail++] = start
       visited[start] = true
-
       var count = 0
       var sumX = 0.0
       var sumY = 0.0
@@ -208,9 +263,7 @@ class LioraOpticalNativeModule : Module() {
           if (y > 0) index - width else -1,
           if (y + 1 < height) index + width else -1,
         )
-        for (neighbor in fourNeighbors) {
-          if (neighbor < 0 || !candidates[neighbor]) perimeter += 1
-        }
+        for (neighbor in fourNeighbors) if (neighbor < 0 || !candidates[neighbor]) perimeter += 1
 
         for (dy in -1..1) {
           for (dx in -1..1) {
@@ -228,20 +281,16 @@ class LioraOpticalNativeModule : Module() {
       }
 
       if (count < minClusterPixels || count > maxClusterPixels || perimeter <= 0) continue
-
-      val centroidX = sumX / count
-      val centroidY = sumY / count
       val compactness = (4.0 * PI * count / perimeter.toDouble().pow(2.0)).coerceIn(0.0, 1.0)
       clusters += mapOf(
-        "relativeX" to if (width > 1) centroidX / (width - 1) * 100.0 else 0.0,
-        "relativeY" to if (height > 1) centroidY / (height - 1) * 100.0 else 0.0,
+        "relativeX" to if (width > 1) (sumX / count) / (width - 1) * 100.0 else 0.0,
+        "relativeY" to if (height > 1) (sumY / count) / (height - 1) * 100.0 else 0.0,
         "clusterSizePx" to count,
         "compactness" to compactness,
         "maxBrightness" to maxBrightness,
         "saturation" to sumSaturation / count,
       )
     }
-
     return clusters
   }
 
@@ -250,19 +299,16 @@ class LioraOpticalNativeModule : Module() {
     var count = 0
     var sum = 0.0
     var sumSquares = 0.0
-
     for (y in 1 until height - 1) {
       for (x in 1 until width - 1) {
         val index = y * width + x
-        val laplacian = 4.0 * luminance[index] -
-          luminance[index - 1] - luminance[index + 1] -
+        val laplacian = 4.0 * luminance[index] - luminance[index - 1] - luminance[index + 1] -
           luminance[index - width] - luminance[index + width]
         count += 1
         sum += laplacian
         sumSquares += laplacian * laplacian
       }
     }
-
     if (count == 0) return 0.0
     val mean = sum / count
     return max(0.0, sumSquares / count - mean * mean)
