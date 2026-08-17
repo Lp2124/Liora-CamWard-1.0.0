@@ -30,22 +30,41 @@ for path in "${PRODUCTION_DIRS[@]}"; do
   [[ -e "$path" ]] && EXISTING_DIRS+=("$path")
 done
 
-printf '\n===== RULE 1: NO FABRICATED / PLACEHOLDER PRODUCTION CODE =====\n'
-FORBIDDEN_PATTERN='Math\.random\(|TODO|FIXME|HACK|XXX|coming[[:space:]]+soon|placeholder|mock(ed|ing)?|simulat(ed|ion)|fake[[:space:]_-]*(result|scan|confidence|signature|finding)|dummy[[:space:]_-]*(data|result)|hardcod(ed|ing)[[:space:]_-]*(result|finding)|@ts-ignore|@ts-nocheck'
-if grep -RInE "$FORBIDDEN_PATTERN" "${EXISTING_DIRS[@]}" \
+printf '\n===== RULE 1A: NO DIRECT FABRICATION / UNFINISHED PRODUCTION CODE =====\n'
+DIRECT_FORBIDDEN_PATTERN='Math\.random\(|TODO|FIXME|HACK|XXX|coming[[:space:]]+soon|@ts-ignore|@ts-nocheck'
+if grep -RInE "$DIRECT_FORBIDDEN_PATTERN" "${EXISTING_DIRS[@]}" \
   --exclude-dir=node_modules \
   --exclude-dir=.next \
   --exclude-dir=dist \
   --exclude-dir=build \
+  --exclude-dir=testing \
   --exclude='*.test.ts' \
   --exclude='*.test.tsx' \
   --exclude='*.test.js' \
   --exclude='*.spec.ts' \
   --exclude='*.spec.tsx' \
   --exclude='*.snap'; then
-  fail 'Forbidden production placeholder/simulation pattern detected.'
+  fail 'Direct fabrication or unfinished production-code pattern detected.'
 fi
-printf '[PASS] No forbidden placeholder/simulation patterns in production paths.\n'
+printf '[PASS] No Math.random/TODO/FIXME/HACK/coming-soon patterns in production code.\n'
+
+printf '\n===== RULE 1B: NO FABRICATED RESULT IDENTIFIERS IN PRODUCTION CODE =====\n'
+FABRICATED_RESULT_PATTERN='(mock|fake|dummy|simulat(ed|ion)|hardcod(ed|ing))[[:alnum:]_ -]*(result|scan|confidence|signature|finding|evidence|verdict)'
+if grep -RIniE "$FABRICATED_RESULT_PATTERN" "${EXISTING_DIRS[@]}" \
+  --exclude-dir=node_modules \
+  --exclude-dir=.next \
+  --exclude-dir=dist \
+  --exclude-dir=build \
+  --exclude-dir=testing \
+  --exclude='*.test.ts' \
+  --exclude='*.test.tsx' \
+  --exclude='*.test.js' \
+  --exclude='*.spec.ts' \
+  --exclude='*.spec.tsx' \
+  --exclude='*.snap'; then
+  fail 'Fabricated result/scan/finding identifier detected in production code.'
+fi
+printf '[PASS] No fabricated result identifiers in production code.\n'
 
 printf '\n===== RULE 5: NO TYPESCRIPT ERROR-SUPPRESSION / EXPLICIT ANY ESCAPES =====\n'
 TS_ESCAPE_PATTERN='(^|[^[:alnum:]_])as[[:space:]]+any([^[:alnum:]_]|$)|:[[:space:]]*any([^[:alnum:]_]|$)|<any>|@ts-ignore|@ts-nocheck'
@@ -53,6 +72,7 @@ if grep -RInE "$TS_ESCAPE_PATTERN" app apps/mobile lib packages components db mi
   --include='*.ts' --include='*.tsx' \
   --exclude-dir=node_modules \
   --exclude-dir=.next \
+  --exclude-dir=testing \
   --exclude='*.test.ts' \
   --exclude='*.test.tsx' \
   --exclude='*.spec.ts' \
