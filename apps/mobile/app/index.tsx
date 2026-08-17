@@ -38,7 +38,7 @@ export default function HomeScreen() {
           />
           <ModuleRow
             title="Exploración Bluetooth"
-            description="Escaneo BLE nativo con RSSI, persistencia y clasificación en servidor."
+            description="Escaneo BLE nativo con RSSI y persistencia de observaciones."
           />
         </View>
 
@@ -49,15 +49,6 @@ export default function HomeScreen() {
           accessibilityRole="button"
         >
           <Text style={styles.startButtonText}>Iniciar inspección</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.historyButton}
-          onPress={() => router.push('/history')}
-          accessibilityLabel="Ver historial de inspecciones"
-          accessibilityRole="button"
-        >
-          <Text style={styles.historyButtonText}>Historial de inspecciones</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -102,15 +93,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',
-    marginBottom: 12,
   },
   startButtonText: { fontSize: 16, fontWeight: '800', color: '#0a0a0a', letterSpacing: 1 },
-  historyButton: {
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-  },
-  historyButtonText: { fontSize: 14, color: '#aaa' },
 });
