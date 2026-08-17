@@ -5,6 +5,7 @@
  * a valid native/web session exists; no bearer/session token is stored in
  * AsyncStorage.
  */
+import { File } from 'expo-file-system/next';
 import type {
   SubmitOpticalObservationRequest,
   SubmitMagneticObservationRequest,
@@ -111,11 +112,14 @@ export async function uploadOpticalEvidence(input: {
   expectedSha256: string;
   expectedSizeBytes: number;
 }): Promise<UploadOpticalEvidenceResponse> {
-  const localResponse = await fetch(input.uri);
-  if (!localResponse.ok) throw new Error('OPTICAL_LOCAL_FILE_READ_FAILED');
-  const bytes = await localResponse.arrayBuffer();
-  if (bytes.byteLength !== input.expectedSizeBytes) {
+  const localFile = new File(input.uri);
+  if (!localFile.exists) throw new Error('OPTICAL_LOCAL_FILE_NOT_FOUND');
+  if (localFile.size !== input.expectedSizeBytes) {
     throw new Error('OPTICAL_LOCAL_FILE_SIZE_CHANGED');
+  }
+  const blob = await localFile.blob();
+  if (blob.size !== input.expectedSizeBytes) {
+    throw new Error('OPTICAL_LOCAL_BLOB_SIZE_CHANGED');
   }
 
   const query = new URLSearchParams({
@@ -129,7 +133,7 @@ export async function uploadOpticalEvidence(input: {
       Accept: 'application/json',
       'Content-Type': 'image/jpeg',
     },
-    body: bytes,
+    body: blob,
     credentials: 'include',
   });
   const result = await readApiResponse<UploadOpticalEvidenceResponse>(response);
