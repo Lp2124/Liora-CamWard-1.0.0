@@ -17,6 +17,7 @@
       "buildNumber": "1",
       "supportsTablet": false,
       "infoPlist": {
+        "NSCameraUsageDescription": "Liora CamWard usa la cámara trasera durante Análisis Óptico para medir reflejos y cambios de brillo en capturas tomadas por el usuario.",
         "NSBluetoothAlwaysUsageDescription": "Liora CamWard explora dispositivos Bluetooth cercanos para obtener evidencia de radio disponible mediante BLE.",
         "NSBluetoothPeripheralUsageDescription": "Liora CamWard necesita Bluetooth para ejecutar la exploración BLE."
       },
@@ -40,6 +41,8 @@
         "backgroundColor": "#0a0a0a"
       },
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.FLASHLIGHT",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_SCAN",
@@ -52,6 +55,14 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Liora CamWard usa la cámara trasera durante Análisis Óptico para medir reflejos y cambios de brillo en capturas tomadas por el usuario.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
       [
         "expo-sensors",
         {
