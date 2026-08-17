@@ -5,7 +5,7 @@
  * are never returned or persisted; each observed native identifier is mapped to
  * a random identifier that exists only for the current scan session.
  */
-import { BleManager, type Device, type Subscription, State } from 'react-native-ble-plx';
+import { BleManager, type Device, State } from 'react-native-ble-plx';
 import { Platform } from 'react-native';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { randomUUID } from 'expo-crypto';
@@ -29,7 +29,7 @@ function getManager(): BleManager {
 
 export async function requestBlePermissions(): Promise<BlePermissionStatus> {
   if (Platform.OS === 'ios') {
-    const result = await request(PERMISSIONS.IOS.BLUETOOTH_PERIPHERAL);
+    const result = await request(PERMISSIONS.IOS.BLUETOOTH);
     if (result === RESULTS.GRANTED) return 'granted';
     if (result === RESULTS.UNAVAILABLE) return 'unavailable';
     return 'denied';
@@ -94,10 +94,9 @@ export async function scanBleWindow(
   }>();
 
   const startMs = Date.now();
-  let subscription: Subscription | null = null;
 
   await new Promise<void>((resolve) => {
-    subscription = getManager().startDeviceScan(
+    getManager().startDeviceScan(
       null,
       { allowDuplicates: true },
       (error, device) => {
@@ -139,7 +138,6 @@ export async function scanBleWindow(
     );
 
     setTimeout(() => {
-      subscription?.remove();
       getManager().stopDeviceScan();
       resolve();
     }, windowMs);
