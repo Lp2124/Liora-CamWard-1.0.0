@@ -59,7 +59,7 @@ export interface SubmitMagneticObservationRequest {
   phase: 'baseline' | 'monitoring';
   samples: MagneticSample[];
   baselineMicroTesla?: number;
-  orientation: { alpha: number; beta: number; gamma: number };
+  orientation?: { alpha: number; beta: number; gamma: number };
   deviceFingerprint: string;
 }
 
@@ -68,7 +68,7 @@ export interface MagneticSample {
   y: number;
   z: number;
   magnitude: number;
-  ts: number; // relative ms
+  ts: number;
 }
 
 export interface SubmitBleObservationRequest {
