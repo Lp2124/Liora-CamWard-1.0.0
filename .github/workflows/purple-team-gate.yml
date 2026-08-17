@@ -1,0 +1,45 @@
+name: Purple Team Reality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - 'fix/**'
+      - 'integration/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: purple-team-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reality-gate:
+    name: Static, Test and Build Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Activate repository pnpm version
+        run: corepack prepare pnpm@10.33.4 --activate
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Purple Team reality gate
+        shell: bash
+        run: bash scripts/purple-team-gate.sh
