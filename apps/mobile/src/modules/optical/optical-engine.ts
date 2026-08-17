@@ -165,6 +165,10 @@ async function uploadFocusedEvidence(
 
   const references: OpticalFrameEvidenceReference[] = [];
   for (const frame of [...selectedOff, ...selectedOn]) {
+    if (frame.captureMode !== 'torch_off' && frame.captureMode !== 'torch_on') {
+      throw new Error('OPTICAL_EVIDENCE_PHASE_INVALID');
+    }
+    const phase = frame.captureMode;
     const crop = await LioraOpticalNative.cropEvidence(
       frame.uri,
       candidate.relativeX,
@@ -174,13 +178,13 @@ async function uploadFocusedEvidence(
     const uploaded = await uploadOpticalEvidence({
       inspectionId,
       captureNonce: frame.captureNonce,
-      phase: frame.captureMode,
+      phase,
       uri: crop.uri,
       expectedSha256: crop.sha256,
       expectedSizeBytes: crop.sizeBytes,
     });
     references.push({
-      phase: frame.captureMode,
+      phase,
       sha256: uploaded.sha256,
       sizeBytes: uploaded.sizeBytes,
       evidenceId: uploaded.evidenceId,
