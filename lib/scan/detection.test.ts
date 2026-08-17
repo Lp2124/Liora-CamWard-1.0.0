@@ -15,13 +15,17 @@ import test from 'node:test';
 // ─────────────────────────────────────────────────────────────────────────────
 
 function makeSamples(count: number, magnitude: number, jitter = 0) {
-  return Array.from({ length: count }, (_, i) => ({
-    x: 0,
-    y: 0,
-    z: magnitude,
-    magnitude: magnitude + (Math.random() - 0.5) * jitter,
-    ts: i * 100,
-  }));
+  return Array.from({ length: count }, (_, i) => {
+    const centeredStep = (i % 7) - 3;
+    const deterministicOffset = jitter === 0 ? 0 : (centeredStep / 3) * (jitter / 2);
+    return {
+      x: 0,
+      y: 0,
+      z: magnitude,
+      magnitude: magnitude + deterministicOffset,
+      ts: i * 100,
+    };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
