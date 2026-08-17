@@ -72,6 +72,12 @@ if git grep -nEI "$SECRET_PATTERN" -- ':!pnpm-lock.yaml' ':!package-lock.json' '
 fi
 printf '[PASS] No tracked env files or obvious credential patterns.\n'
 
+printf '\n===== REPRODUCIBLE WORKSPACE CHECK =====\n'
+if ! grep -qE '^  apps/mobile:$' pnpm-lock.yaml; then
+  fail 'pnpm-lock.yaml does not contain the apps/mobile workspace importer. Run Expo dependency alignment and regenerate the lock before this gate.'
+fi
+printf '[PASS] Mobile workspace is represented in pnpm-lock.yaml.\n'
+
 command -v pnpm >/dev/null 2>&1 || fail 'pnpm is not installed.'
 
 run 'ROOT TYPECHECK' pnpm typecheck
@@ -85,6 +91,7 @@ run 'ROOT BUILD' pnpm build
 
 printf '\n===== RULE 8: MOBILE PACKAGE CHECK =====\n'
 run 'MOBILE OPTICAL TESTS' pnpm --filter @liora/mobile test -- --runInBand
+run 'EXPO DOCTOR' pnpm --filter @liora/mobile exec expo-doctor
 
 printf '\n========================================\n'
 printf '[PASS] STATIC + TEST + BUILD GATES PASSED\n'
