@@ -25,6 +25,20 @@ public class LioraOpticalNativeModule: Module {
         edgeMarginPixels: max(0, edgeMarginPixels)
       )
     }
+
+    AsyncFunction("cropEvidence") { (
+      uri: String,
+      centerXPercent: Double,
+      centerYPercent: Double,
+      regionPercent: Double
+    ) -> [String: Any] in
+      return try self.cropEvidence(
+        uri: uri,
+        centerXPercent: min(100, max(0, centerXPercent)),
+        centerYPercent: min(100, max(0, centerYPercent)),
+        regionPercent: min(60, max(5, regionPercent))
+      )
+    }
   }
 
   private func analyzeImage(
@@ -36,29 +50,17 @@ public class LioraOpticalNativeModule: Module {
     maxDimension: Int,
     edgeMarginPixels: Int
   ) throws -> [String: Any] {
-    guard let url = URL(string: uri), url.isFileURL else {
-      throw OpticalNativeError.invalidLocalUri
-    }
-
-    let data = try Data(contentsOf: url, options: [.mappedIfSafe])
-    guard !data.isEmpty else { throw OpticalNativeError.emptyFile }
-    guard let sourceImage = UIImage(data: data) else { throw OpticalNativeError.decodeFailed }
-
+    let (data, sourceImage) = try loadLocalImage(uri: uri)
     let sourceWidth = Int(sourceImage.size.width * sourceImage.scale)
     let sourceHeight = Int(sourceImage.size.height * sourceImage.scale)
     guard sourceWidth > 0, sourceHeight > 0 else { throw OpticalNativeError.decodeFailed }
 
     let targetSize = scaledSize(width: sourceWidth, height: sourceHeight, maxDimension: maxDimension)
-    let format = UIGraphicsImageRendererFormat()
-    format.scale = 1
-    format.opaque = true
-    let renderer = UIGraphicsImageRenderer(
-      size: CGSize(width: targetSize.width, height: targetSize.height),
-      format: format
+    let rendered = renderOriented(
+      sourceImage,
+      width: targetSize.width,
+      height: targetSize.height
     )
-    let rendered = renderer.image { _ in
-      sourceImage.draw(in: CGRect(x: 0, y: 0, width: targetSize.width, height: targetSize.height))
-    }
     guard let cgImage = rendered.cgImage else { throw OpticalNativeError.decodeFailed }
 
     let width = cgImage.width
@@ -95,7 +97,6 @@ public class LioraOpticalNativeModule: Module {
       let maxChannel = max(r, max(g, b))
       let minChannel = min(r, min(g, b))
       let saturation = maxChannel <= 0 ? 0 : (maxChannel - minChannel) / maxChannel
-
       luminance[index] = luma
       saturations[index] = saturation
       brightnessSum += luma
@@ -112,18 +113,6 @@ public class LioraOpticalNativeModule: Module {
       }
     }
 
-    let clusters = extractClusters(
-      candidates: candidates,
-      luminance: luminance,
-      saturations: saturations,
-      width: width,
-      height: height,
-      minClusterPixels: minClusterPixels,
-      maxClusterPixels: maxClusterPixels
-    )
-
-    let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-
     return [
       "sourceWidth": sourceWidth,
       "sourceHeight": sourceHeight,
@@ -132,20 +121,91 @@ public class LioraOpticalNativeModule: Module {
       "brightnessEstimate": brightnessSum / Double(pixelCount),
       "overexposedRatio": Double(overexposedCount) / Double(pixelCount),
       "sharpnessVariance": laplacianVariance(luminance: luminance, width: width, height: height),
-      "sha256": digest,
+      "sha256": sha256(data),
       "sizeBytes": data.count,
-      "clusters": clusters,
+      "clusters": extractClusters(
+        candidates: candidates,
+        luminance: luminance,
+        saturations: saturations,
+        width: width,
+        height: height,
+        minClusterPixels: minClusterPixels,
+        maxClusterPixels: maxClusterPixels
+      ),
     ]
+  }
+
+  private func cropEvidence(
+    uri: String,
+    centerXPercent: Double,
+    centerYPercent: Double,
+    regionPercent: Double
+  ) throws -> [String: Any] {
+    let (_, sourceImage) = try loadLocalImage(uri: uri)
+    let sourceWidth = Int(sourceImage.size.width * sourceImage.scale)
+    let sourceHeight = Int(sourceImage.size.height * sourceImage.scale)
+    guard sourceWidth > 0, sourceHeight > 0 else { throw OpticalNativeError.decodeFailed }
+
+    let oriented = renderOriented(sourceImage, width: sourceWidth, height: sourceHeight)
+    guard let cgImage = oriented.cgImage else { throw OpticalNativeError.decodeFailed }
+    let side = min(
+      min(cgImage.width, cgImage.height),
+      max(32, Int(Double(min(cgImage.width, cgImage.height)) * regionPercent / 100.0))
+    )
+    let centerX = Int(Double(cgImage.width) * centerXPercent / 100.0)
+    let centerY = Int(Double(cgImage.height) * centerYPercent / 100.0)
+    let left = min(max(0, centerX - side / 2), cgImage.width - side)
+    let top = min(max(0, centerY - side / 2), cgImage.height - side)
+    guard let croppedCg = cgImage.cropping(to: CGRect(x: left, y: top, width: side, height: side)) else {
+      throw OpticalNativeError.cropFailed
+    }
+    let cropped = UIImage(cgImage: croppedCg)
+    guard let jpeg = cropped.jpegData(compressionQuality: 0.92) else {
+      throw OpticalNativeError.encodeFailed
+    }
+
+    let output = FileManager.default.temporaryDirectory
+      .appendingPathComponent("liora-optical-\(UUID().uuidString).jpg")
+    try jpeg.write(to: output, options: [.atomic])
+
+    return [
+      "uri": output.absoluteString,
+      "width": side,
+      "height": side,
+      "sha256": sha256(jpeg),
+      "sizeBytes": jpeg.count,
+    ]
+  }
+
+  private func loadLocalImage(uri: String) throws -> (Data, UIImage) {
+    guard let url = URL(string: uri), url.isFileURL else { throw OpticalNativeError.invalidLocalUri }
+    let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+    guard !data.isEmpty else { throw OpticalNativeError.emptyFile }
+    guard let image = UIImage(data: data) else { throw OpticalNativeError.decodeFailed }
+    return (data, image)
+  }
+
+  private func renderOriented(_ image: UIImage, width: Int, height: Int) -> UIImage {
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.opaque = true
+    return UIGraphicsImageRenderer(
+      size: CGSize(width: width, height: height),
+      format: format
+    ).image { _ in
+      image.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+    }
+  }
+
+  private func sha256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
   private func scaledSize(width: Int, height: Int, maxDimension: Int) -> (width: Int, height: Int) {
     let largest = max(width, height)
     guard largest > maxDimension else { return (width, height) }
     let scale = Double(maxDimension) / Double(largest)
-    return (
-      max(1, Int(Double(width) * scale)),
-      max(1, Int(Double(height) * scale))
-    )
+    return (max(1, Int(Double(width) * scale)), max(1, Int(Double(height) * scale)))
   }
 
   private func extractClusters(
@@ -163,13 +223,11 @@ public class LioraOpticalNativeModule: Module {
 
     for start in candidates.indices {
       if !candidates[start] || visited[start] { continue }
-
       var head = 0
       var tail = 0
       queue[tail] = start
       tail += 1
       visited[start] = true
-
       var count = 0
       var sumX = 0.0
       var sumY = 0.0
@@ -187,16 +245,13 @@ public class LioraOpticalNativeModule: Module {
         sumY += Double(y)
         sumSaturation += saturations[index]
         maxBrightness = max(maxBrightness, luminance[index])
-
         let neighbors4 = [
           x > 0 ? index - 1 : -1,
           x + 1 < width ? index + 1 : -1,
           y > 0 ? index - width : -1,
           y + 1 < height ? index + width : -1,
         ]
-        for neighbor in neighbors4 where neighbor < 0 || !candidates[neighbor] {
-          perimeter += 1
-        }
+        for neighbor in neighbors4 where neighbor < 0 || !candidates[neighbor] { perimeter += 1 }
 
         for dy in -1...1 {
           for dx in -1...1 {
@@ -215,20 +270,16 @@ public class LioraOpticalNativeModule: Module {
       }
 
       if count < minClusterPixels || count > maxClusterPixels || perimeter <= 0 { continue }
-
-      let centroidX = sumX / Double(count)
-      let centroidY = sumY / Double(count)
       let compactness = min(1.0, max(0.0, 4.0 * Double.pi * Double(count) / pow(Double(perimeter), 2.0)))
       clusters.append([
-        "relativeX": width > 1 ? centroidX / Double(width - 1) * 100.0 : 0.0,
-        "relativeY": height > 1 ? centroidY / Double(height - 1) * 100.0 : 0.0,
+        "relativeX": width > 1 ? (sumX / Double(count)) / Double(width - 1) * 100.0 : 0.0,
+        "relativeY": height > 1 ? (sumY / Double(count)) / Double(height - 1) * 100.0 : 0.0,
         "clusterSizePx": count,
         "compactness": compactness,
         "maxBrightness": maxBrightness,
         "saturation": sumSaturation / Double(count),
       ])
     }
-
     return clusters
   }
 
@@ -237,21 +288,17 @@ public class LioraOpticalNativeModule: Module {
     var count = 0
     var sum = 0.0
     var sumSquares = 0.0
-
     for y in 1..<(height - 1) {
       for x in 1..<(width - 1) {
         let index = y * width + x
         let laplacian = 4.0 * luminance[index]
-          - luminance[index - 1]
-          - luminance[index + 1]
-          - luminance[index - width]
-          - luminance[index + width]
+          - luminance[index - 1] - luminance[index + 1]
+          - luminance[index - width] - luminance[index + width]
         count += 1
         sum += laplacian
         sumSquares += laplacian * laplacian
       }
     }
-
     guard count > 0 else { return 0 }
     let mean = sum / Double(count)
     return max(0, sumSquares / Double(count) - mean * mean)
@@ -263,4 +310,6 @@ private enum OpticalNativeError: Error {
   case emptyFile
   case decodeFailed
   case imageTooSmall
+  case cropFailed
+  case encodeFailed
 }
